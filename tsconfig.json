@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noUncheckedIndexedAccess": true, // Catches arr[0] undefined bugs
+    "exactOptionalPropertyTypes": true, // { x?: string } ≠ { x: undefined }
+    "noImplicitReturns": true, // Missing return catches
+    "noFallthroughCasesInSwitch": true // Missing break catches
+  },
+  "include": ["src/**/*.ts", "src/entities/User.ts"],
+  "exclude": ["node_modules", "dist"]
+}
