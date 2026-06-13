@@ -1,0 +1,64 @@
+import { Entity, PrimaryColumn, Column } from "typeorm";
+
+@Entity("matches")
+export class Match {
+  @PrimaryColumn()
+  match_id!: string;
+
+  @Column()
+  world_cup_year!: number;
+
+  @Column()
+  stage_name!: string;
+
+  @Column({ nullable: true })
+  group_name!: string;
+
+  @Column({ default: false })
+  must_be_replayed!: boolean;
+
+  @Column({ default: false })
+  replay!: boolean;
+
+  @Column()
+  date!: string;
+
+  @Column({ nullable: true })
+  time!: string;
+
+  @Column()
+  stadium_id!: string;
+
+  @Column()
+  home_team_id!: string;
+
+  @Column()
+  away_team_id!: string;
+
+  @Column()
+  home_score!: number;
+
+  @Column()
+  away_score!: number;
+
+  @Column({ nullable: true })
+  home_score_margin!: number;
+
+  @Column({ nullable: true })
+  away_score_margin!: number;
+
+  @Column({ default: false })
+  extra_time!: boolean;
+
+  @Column({ default: false })
+  penalties!: boolean;
+
+  @Column({ nullable: true })
+  home_penalty_score!: number;
+
+  @Column({ nullable: true })
+  away_penalty_score!: number;
+
+  @Column()
+  winner!: string;
+}

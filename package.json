@@ -10,7 +10,9 @@
     "start": "node module-alias/register dist/index.js",
     "migration:generate": "typeorm migration:generate -d src/config/dataSource.ts",
     "migration:run": "typeorm migration:run -d src/config/dataSource.ts",
-    "migration:revert": "typeorm migration:revert -d src/config/dataSource.ts"
+    "migration:revert": "typeorm migration:revert -d src/config/dataSource.ts",
+    "seed:goals": "ts-node-dev --transpile-only src/seeds/goals/seedGoals.ts",
+    "script": "ts-node-dev --transpile-only src/scripts/getMaxScorer.ts"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +25,8 @@
     "helmet": "^8.2.0",
     "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
-    "typeorm": "^1.0.0"
+    "typeorm": "^1.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

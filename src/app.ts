@@ -7,7 +7,7 @@ import cors from "cors";
 import helmet from "helmet";
 
 import { errorHandler } from "@/middlewares/errorHandler";
-import userRoutes from "@/routes/users";
+// import userRoutes from "@/routes/users";
 
 const app: express.Application = express();
 
@@ -18,7 +18,7 @@ app.use(express.json());
 
 // Routes
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
-app.use("/api/users", userRoutes);
+// app.use("/api/users", userRoutes);
 
 app.use(errorHandler);
 
