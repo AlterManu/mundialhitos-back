@@ -12,7 +12,7 @@ export class Match {
   stage_name!: string;
 
   @Column({ nullable: true })
-  group_name!: string;
+  group_name!: string | null;
 
   @Column({ default: false })
   must_be_replayed!: boolean;
@@ -24,7 +24,7 @@ export class Match {
   date!: string;
 
   @Column({ nullable: true })
-  time!: string;
+  time!: string | null;
 
   @Column()
   stadium_id!: string;
@@ -42,10 +42,10 @@ export class Match {
   away_score!: number;
 
   @Column({ nullable: true })
-  home_score_margin!: number;
+  home_score_margin!: number | null;
 
   @Column({ nullable: true })
-  away_score_margin!: number;
+  away_score_margin!: number | null;
 
   @Column({ default: false })
   extra_time!: boolean;
@@ -54,10 +54,10 @@ export class Match {
   penalties!: boolean;
 
   @Column({ nullable: true })
-  home_penalty_score!: number;
+  home_penalty_score!: number | null;
 
   @Column({ nullable: true })
-  away_penalty_score!: number;
+  away_penalty_score!: number | null;
 
   @Column()
   winner!: string;

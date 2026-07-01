@@ -11,7 +11,9 @@
     "migration:generate": "typeorm migration:generate -d src/config/dataSource.ts",
     "migration:run": "typeorm migration:run -d src/config/dataSource.ts",
     "migration:revert": "typeorm migration:revert -d src/config/dataSource.ts",
+    "historical:import": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/importHistoricalDatasets.ts",
     "seed:goals": "ts-node-dev --transpile-only src/seeds/goals/seedGoals.ts",
+    "stats:rebuild": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/rebuildStatistics.ts",
     "script": "ts-node-dev --transpile-only src/scripts/getMaxScorer.ts"
   },
   "keywords": [],

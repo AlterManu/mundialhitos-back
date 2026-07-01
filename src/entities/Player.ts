@@ -11,8 +11,8 @@ export class Player {
   @Column({ type: "varchar", nullable: true })
   lastname!: string | null;
 
-  @Column()
-  birth_date!: boolean;
+  @Column({ type: "date", nullable: true })
+  birth_date!: string | null;
 
   @Column()
   goal_keeper!: boolean;
@@ -29,7 +29,7 @@ export class Player {
   @Column()
   count_tournaments!: number;
 
-  @Column()
+  @Column({ type: "text", default: "" })
   list_tournaments!: string;
 
   @Column({ nullable: true })

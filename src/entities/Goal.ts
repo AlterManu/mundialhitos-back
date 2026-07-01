@@ -18,7 +18,7 @@ export class Goal {
   scored_by_player!: string;
 
   @Column({ nullable: true })
-  scored_vs_team!: string;
+  scored_vs_team!: string | null;
 
   @Column()
   shirt_number!: number;
