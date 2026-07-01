@@ -11,7 +11,7 @@ export class Match {
   @Column()
   stage_name!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   group_name!: string | null;
 
   @Column({ default: false })
@@ -23,7 +23,7 @@ export class Match {
   @Column()
   date!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   time!: string | null;
 
   @Column()
@@ -41,10 +41,10 @@ export class Match {
   @Column()
   away_score!: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   home_score_margin!: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   away_score_margin!: number | null;
 
   @Column({ default: false })
@@ -53,10 +53,10 @@ export class Match {
   @Column({ default: false })
   penalties!: boolean;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   home_penalty_score!: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   away_penalty_score!: number | null;
 
   @Column()

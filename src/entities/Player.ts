@@ -32,12 +32,12 @@ export class Player {
   @Column({ type: "text", default: "" })
   list_tournaments!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   goals!: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   own_goals!: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   penalties_scored!: number;
 }

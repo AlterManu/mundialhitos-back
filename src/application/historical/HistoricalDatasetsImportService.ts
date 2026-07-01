@@ -1,5 +1,5 @@
 import path from "path";
-import { DataSource } from "typeorm";
+import { DataSource, ObjectLiteral, Repository } from "typeorm";
 import { Card } from "@/entities/Card";
 import { Goal } from "@/entities/Goal";
 import { GroupStanding } from "@/entities/GroupStanding";
@@ -36,12 +36,12 @@ export interface HistoricalImportResult {
 
 export class HistoricalDatasetsImportService {
   private readonly datasetsReader: CsvDatasetReader;
-  private readonly seedReader: CsvDatasetReader;
 
   constructor(private readonly dataSource: DataSource) {
     const projectRoot = path.resolve(__dirname, "../../..");
-    this.datasetsReader = new CsvDatasetReader(path.join(projectRoot, "datasets"));
-    this.seedReader = new CsvDatasetReader(path.join(projectRoot, "src", "seeds"));
+    this.datasetsReader = new CsvDatasetReader(
+      path.join(projectRoot, "datasets"),
+    );
   }
 
   async importAll(): Promise<HistoricalImportResult> {
@@ -101,7 +101,7 @@ export class HistoricalDatasetsImportService {
         count_teams: number(row, "count_teams"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -119,7 +119,7 @@ export class HistoricalDatasetsImportService {
         end_date: date(row, "end_date"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -134,13 +134,13 @@ export class HistoricalDatasetsImportService {
         confederation_id: text(row, "confederation_id"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
   private async importPlayers() {
     const repo = this.dataSource.getRepository(Player);
-    const rows = this.seedReader.readRows(path.join("players", "players.csv"));
+    const rows = this.datasetsReader.readRows("players.csv");
     const entities = rows.map((row) =>
       repo.create({
         player_id: text(row, "player_id"),
@@ -158,7 +158,7 @@ export class HistoricalDatasetsImportService {
         penalties_scored: 0,
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -189,13 +189,13 @@ export class HistoricalDatasetsImportService {
         winner: winnerId(row),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
   private async importGoals() {
     const repo = this.dataSource.getRepository(Goal);
-    const rows = this.seedReader.readRows(path.join("goals", "goals.csv"));
+    const rows = this.datasetsReader.readRows("goals.csv");
     const entities = rows.map((row) =>
       repo.create({
         goal_id: text(row, "goal_id"),
@@ -212,7 +212,7 @@ export class HistoricalDatasetsImportService {
         penalty: bool(row, "penalty"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -234,7 +234,7 @@ export class HistoricalDatasetsImportService {
         second_yellow_card: bool(row, "second_yellow_card"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -255,7 +255,7 @@ export class HistoricalDatasetsImportService {
         coming_on: bool(row, "coming_on"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -272,13 +272,15 @@ export class HistoricalDatasetsImportService {
         converted: bool(row, "converted"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
   private async importSquadMembers() {
     const repo = this.dataSource.getRepository(SquadMember);
-    const rows = this.datasetsReader.readRows("squads (convocados por equipo).csv");
+    const rows = this.datasetsReader.readRows(
+      "squads (convocados por equipo).csv",
+    );
     const entities = rows.map((row) =>
       repo.create({
         world_cup_year: number(row, "world_cup_year"),
@@ -289,7 +291,7 @@ export class HistoricalDatasetsImportService {
         position_code: nullableText(row, "position_code"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -310,7 +312,7 @@ export class HistoricalDatasetsImportService {
         captain: bool(row, "captain"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -335,13 +337,15 @@ export class HistoricalDatasetsImportService {
         draw: bool(row, "draw"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
   private async importGroupStandings() {
     const repo = this.dataSource.getRepository(GroupStanding);
-    const rows = this.datasetsReader.readRows("group_standings (posiciones en cada grupo).csv");
+    const rows = this.datasetsReader.readRows(
+      "group_standings (posiciones en cada grupo).csv",
+    );
     const entities = rows.map((row) =>
       repo.create({
         tournament_id: text(row, "tournament_id"),
@@ -361,7 +365,7 @@ export class HistoricalDatasetsImportService {
         advanced: bool(row, "advanced"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 
@@ -375,7 +379,7 @@ export class HistoricalDatasetsImportService {
         team_id: text(row, "team_id"),
       }),
     );
-    await repo.save(entities);
+    await saveInChunks(repo, entities);
     return entities.length;
   }
 }
@@ -388,7 +392,10 @@ function normalizedText(row: Record<string, unknown>, key: string): string {
   return date(row, key) ?? text(row, key);
 }
 
-function nullableText(row: Record<string, unknown>, key: string): string | null {
+function nullableText(
+  row: Record<string, unknown>,
+  key: string,
+): string | null {
   const value = text(row, key);
   return value.length > 0 && value !== "not applicable" ? value : null;
 }
@@ -398,7 +405,10 @@ function number(row: Record<string, unknown>, key: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function nullableNumber(row: Record<string, unknown>, key: string): number | null {
+function nullableNumber(
+  row: Record<string, unknown>,
+  key: string,
+): number | null {
   const value = row[key];
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -413,15 +423,40 @@ function bool(row: Record<string, unknown>, key: string): boolean {
 function date(row: Record<string, unknown>, key: string): string | null {
   const value = text(row, key);
   if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return isValidIsoDate(value) ? value : null;
+  }
 
-  const parts = value.split("/");
+  const parts = value.split(/[/-]/);
   if (parts.length !== 3) return null;
 
-  const [day, month, year] = parts;
-  if (!day || !month || !year) return null;
+  const [first, second, rawYear] = parts;
+  if (!first || !second || !rawYear) return null;
 
-  return `${year.padStart(4, "0")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  const firstNumber = Number(first);
+  const secondNumber = Number(second);
+  const year = normalizeYear(rawYear);
+
+  if (!year || !Number.isInteger(firstNumber) || !Number.isInteger(secondNumber)) {
+    return null;
+  }
+
+  const candidates =
+    firstNumber > 12 && secondNumber <= 12
+      ? [{ day: firstNumber, month: secondNumber }]
+      : secondNumber > 12 && firstNumber <= 12
+        ? [{ day: secondNumber, month: firstNumber }]
+        : [
+            { day: firstNumber, month: secondNumber },
+            { day: secondNumber, month: firstNumber },
+          ];
+
+  for (const candidate of candidates) {
+    const isoDate = toIsoDate(year, candidate.month, candidate.day);
+    if (isoDate) return isoDate;
+  }
+
+  return null;
 }
 
 function winnerId(row: Record<string, unknown>): string {
@@ -429,4 +464,53 @@ function winnerId(row: Record<string, unknown>): string {
   if (winner === "home team win") return text(row, "home_team_id");
   if (winner === "away team win") return text(row, "away_team_id");
   return "0";
+}
+
+async function saveInChunks<T extends ObjectLiteral>(
+  repo: Repository<T>,
+  entities: T[],
+  chunkSize = 500,
+): Promise<void> {
+  for (let index = 0; index < entities.length; index += chunkSize) {
+    await repo.save(entities.slice(index, index + chunkSize));
+  }
+}
+
+function normalizeYear(rawYear: string): number | null {
+  const parsed = Number(rawYear);
+  if (!Number.isInteger(parsed)) return null;
+
+  if (rawYear.length === 2) {
+    return parsed <= 30 ? 2000 + parsed : 1900 + parsed;
+  }
+
+  return parsed;
+}
+
+function toIsoDate(year: number, month: number, day: number): string | null {
+  if (year < 1800 || year > 2100) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+
+  const dateValue = new Date(Date.UTC(year, month - 1, day));
+  if (
+    dateValue.getUTCFullYear() !== year ||
+    dateValue.getUTCMonth() !== month - 1 ||
+    dateValue.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year.toString().padStart(4, "0")}-${month
+    .toString()
+    .padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+}
+
+function isValidIsoDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number);
+  if (year === undefined || month === undefined || day === undefined) {
+    return false;
+  }
+
+  return toIsoDate(year, month, day) === value;
 }

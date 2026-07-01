@@ -12,21 +12,21 @@ export class TeamOpponentStats {
   @Column()
   opponent_team_id!: string;
 
-  @Column({ default: 0 })
-  matches!: number;
+  @Column({ type: "integer", default: 0 })
+  matches: number = 0;
 
-  @Column({ default: 0 })
-  wins!: number;
+  @Column({ type: "integer", default: 0 })
+  wins: number = 0;
 
-  @Column({ default: 0 })
-  draws!: number;
+  @Column({ type: "integer", default: 0 })
+  draws: number = 0;
 
-  @Column({ default: 0 })
-  losses!: number;
+  @Column({ type: "integer", default: 0 })
+  losses: number = 0;
 
-  @Column({ default: 0 })
-  goals_for!: number;
+  @Column({ type: "integer", default: 0 })
+  goals_for: number = 0;
 
-  @Column({ default: 0 })
-  goals_against!: number;
+  @Column({ type: "integer", default: 0 })
+  goals_against: number = 0;
 }

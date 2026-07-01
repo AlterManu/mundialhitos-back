@@ -18,10 +18,10 @@ export class RecordBookEntry {
   @Column({ type: "float" })
   value!: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   match_id!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   tournament_id!: string | null;
 
   @Column({ type: "jsonb", default: () => "'{}'::jsonb" })

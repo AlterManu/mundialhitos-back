@@ -8,7 +8,7 @@ export class MatchStateSnapshot {
   @Column()
   match_id!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   event_log_id!: string | null;
 
   @Column({ default: 0 })
@@ -17,10 +17,10 @@ export class MatchStateSnapshot {
   @Column({ default: 0 })
   away_goals!: number;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   status!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   minute!: number | null;
 
   @Column({ type: "jsonb", default: () => "'{}'::jsonb" })

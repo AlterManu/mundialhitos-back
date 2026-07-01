@@ -12,12 +12,12 @@ export class PlayerOpponentStats {
   @Column()
   opponent_team_id!: string;
 
-  @Column({ default: 0 })
-  goals!: number;
+  @Column({ type: "integer", default: 0 })
+  goals: number = 0;
 
-  @Column({ default: 0 })
-  penalties_scored!: number;
+  @Column({ type: "integer", default: 0 })
+  penalties_scored: number = 0;
 
-  @Column({ default: 0 })
-  matches!: number;
+  @Column({ type: "integer", default: 0 })
+  matches: number = 0;
 }

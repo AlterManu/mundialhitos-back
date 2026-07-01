@@ -18,13 +18,13 @@ export class PlayerAppearance {
   @Column()
   player_id!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   shirt_number!: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   position_name!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   position_code!: string | null;
 
   @Column({ default: false })

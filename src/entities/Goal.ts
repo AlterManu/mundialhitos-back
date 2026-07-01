@@ -17,7 +17,7 @@ export class Goal {
   @Column()
   scored_by_player!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   scored_vs_team!: string | null;
 
   @Column()

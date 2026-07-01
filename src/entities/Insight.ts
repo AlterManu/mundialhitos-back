@@ -32,7 +32,7 @@ export class Insight {
   @Column()
   match_id!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   event_log_id!: string | null;
 
   @Column()

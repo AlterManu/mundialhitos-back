@@ -17,10 +17,10 @@ export class WorldCup {
   @Column({ type: "date", nullable: true })
   end_date!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   host_country!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   winner_team_id!: string | null;
 
   @Column({ default: 0 })

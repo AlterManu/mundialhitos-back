@@ -35,19 +35,19 @@ export class LiveEventLog {
   @Column()
   match_id!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   team_id!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   player_id!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   opponent_id!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   minute!: number | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "integer", nullable: true })
   additional_minute!: number | null;
 
   @Column({ default: 0 })
