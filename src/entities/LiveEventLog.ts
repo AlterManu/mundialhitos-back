@@ -8,6 +8,8 @@ export enum LiveEventKind {
   MatchStatusChanged = "match_status_changed",
   StatisticChanged = "statistic_changed",
   VarDecision = "var_decision",
+  PenaltyMissed = "penalty_missed",
+  PenaltyShootoutKick = "penalty_shootout_kick",
 }
 
 export enum LiveEventProcessingStatus {

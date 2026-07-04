@@ -68,7 +68,7 @@ export class ApiFootballLiveEventMapper {
     const opponentId =
       teamId === homeTeamId ? awayTeamId : teamId === awayTeamId ? homeTeamId : null;
 
-    const kind = this.mapKind(event.type);
+    const kind = this.mapKind(event);
     if (!kind) return null;
 
     return {
@@ -93,11 +93,18 @@ export class ApiFootballLiveEventMapper {
     } as LiveEvent;
   }
 
-  private mapKind(type: string): LiveEventKind | null {
-    if (type === "Goal") return LiveEventKind.GoalScored;
-    if (type === "Card") return LiveEventKind.CardShown;
-    if (type === "subst") return LiveEventKind.SubstitutionMade;
-    if (type === "Var") return LiveEventKind.VarDecision;
+  private mapKind(event: ApiFootballFixtureEventDto): LiveEventKind | null {
+    if (event.comments === "Penalty Shootout") {
+      return LiveEventKind.PenaltyShootoutKick;
+    }
+
+    if (event.type === "Goal") {
+      if (event.detail === "Missed Penalty") return LiveEventKind.PenaltyMissed;
+      return LiveEventKind.GoalScored;
+    }
+    if (event.type === "Card") return LiveEventKind.CardShown;
+    if (event.type === "subst") return LiveEventKind.SubstitutionMade;
+    if (event.type === "Var") return LiveEventKind.VarDecision;
     return null;
   }
 

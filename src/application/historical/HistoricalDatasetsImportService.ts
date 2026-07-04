@@ -129,8 +129,8 @@ export class HistoricalDatasetsImportService {
     const entities = rows.map((row) =>
       repo.create({
         team_id: text(row, "team_id"),
-        name_en: text(row, "name_en"),
-        team_code_en: text(row, "team_code_en"),
+        name_en: textAny(row, ["name_en", "team_name"]),
+        team_code_en: textAny(row, ["team_code_en", "team_code"]),
         confederation_id: text(row, "confederation_id"),
       }),
     );
@@ -386,6 +386,15 @@ export class HistoricalDatasetsImportService {
 
 function text(row: Record<string, unknown>, key: string): string {
   return String(row[key] ?? "").trim();
+}
+
+function textAny(row: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = text(row, key);
+    if (value) return value;
+  }
+
+  return "";
 }
 
 function normalizedText(row: Record<string, unknown>, key: string): string {

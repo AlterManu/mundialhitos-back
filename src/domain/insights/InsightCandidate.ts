@@ -1,7 +1,8 @@
-import { InsightScope } from "@/entities/Insight";
+import { InsightPhase, InsightScope } from "@/entities/Insight";
 
 export interface InsightCandidate {
   type: string;
+  phase?: InsightPhase;
   scope: InsightScope;
   subjectId: string;
   matchId: string;

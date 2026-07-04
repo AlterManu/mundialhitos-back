@@ -1,6 +1,6 @@
 import { DataSource, Repository } from "typeorm";
 import { InsightCandidate } from "@/domain/insights/InsightCandidate";
-import { Insight, InsightStatus } from "@/entities/Insight";
+import { Insight, InsightPhase, InsightStatus } from "@/entities/Insight";
 
 export class InsightPersistenceService {
   private readonly insightRepo: Repository<Insight>;
@@ -23,6 +23,7 @@ export class InsightPersistenceService {
 
       const insight = this.insightRepo.create({
         type: candidate.type,
+        phase: candidate.phase ?? InsightPhase.Live,
         scope: candidate.scope,
         subject_id: candidate.subjectId,
         match_id: candidate.matchId,

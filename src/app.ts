@@ -8,7 +8,11 @@ import helmet from "helmet";
 
 import { errorHandler } from "@/middlewares/errorHandler";
 import { insightRoutes } from "@/routes/insightRoutes";
+import { fixtureRoutes } from "@/routes/fixtureRoutes";
 import { liveRoutes } from "@/routes/liveRoutes";
+import { pollingRoutes } from "@/routes/pollingRoutes";
+import { devRoutes } from "@/routes/devRoutes";
+import { mappingRoutes } from "@/routes/mappingRoutes";
 // import userRoutes from "@/routes/users";
 
 const app: express.Application = express();
@@ -20,8 +24,12 @@ app.use(express.json());
 
 // Routes
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.use("/api/fixtures", fixtureRoutes);
 app.use("/api/insights", insightRoutes);
 app.use("/api/live", liveRoutes);
+app.use("/api/mappings", mappingRoutes);
+app.use("/api/polling", pollingRoutes);
+app.use("/api/dev", devRoutes);
 // app.use("/api/users", userRoutes);
 
 app.use(errorHandler);

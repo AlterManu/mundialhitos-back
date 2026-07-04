@@ -1,7 +1,7 @@
 import { isGoalScoredEvent } from "@/domain/live/LiveEvent";
 import { InsightImportance } from "@/domain/insights/InsightImportance";
 import { InsightRule, InsightRuleContext } from "@/domain/insights/InsightRule";
-import { InsightScope } from "@/entities/Insight";
+import { InsightPhase, InsightScope } from "@/entities/Insight";
 
 export class TeamFirstGoalVsOpponentRule implements InsightRule {
   readonly id = "team-first-goal-vs-opponent";
@@ -17,6 +17,7 @@ export class TeamFirstGoalVsOpponentRule implements InsightRule {
     return [
       {
         type: this.id,
+        phase: InsightPhase.Live,
         scope: InsightScope.HeadToHead,
         subjectId: `${event.teamId}:${event.opponentId}`,
         matchId: event.matchId,

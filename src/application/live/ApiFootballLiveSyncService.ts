@@ -2,11 +2,13 @@ import { DataSource } from "typeorm";
 import { ApiFootballClient } from "@/infrastructure/apiFootball/ApiFootballClient";
 import { ApiFootballLiveEventMapper } from "@/infrastructure/apiFootball/ApiFootballLiveEventMapper";
 import { ExternalIdMappingResolver } from "@/infrastructure/apiFootball/ExternalIdMappingResolver";
+import { ApiFootballFixtureStore } from "./ApiFootballFixtureStore";
 import { LiveEventProcessor } from "./LiveEventProcessor";
 
 export class ApiFootballLiveSyncService {
   private readonly mapper: ApiFootballLiveEventMapper;
   private readonly processor: LiveEventProcessor;
+  private readonly fixtureStore: ApiFootballFixtureStore;
 
   constructor(
     dataSource: DataSource,
@@ -16,6 +18,7 @@ export class ApiFootballLiveSyncService {
       new ExternalIdMappingResolver(dataSource),
     );
     this.processor = new LiveEventProcessor(dataSource);
+    this.fixtureStore = new ApiFootballFixtureStore(dataSource);
   }
 
   async syncFixture(fixtureId: number) {
@@ -24,6 +27,7 @@ export class ApiFootballLiveSyncService {
       return { fixtureId, events: 0, insights: 0, processed: [] };
     }
 
+    await this.fixtureStore.upsertFixture(fixture);
     const events = await this.mapper.toLiveEvents(fixture);
     const processed = [];
 

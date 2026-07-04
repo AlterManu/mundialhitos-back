@@ -14,6 +14,12 @@ export enum InsightScope {
   HeadToHead = "head_to_head",
 }
 
+export enum InsightPhase {
+  PreMatch = "pre_match",
+  Live = "live",
+  PostMatch = "post_match",
+}
+
 @Entity("insights")
 @Unique(["dedupe_key"])
 export class Insight {
@@ -22,6 +28,9 @@ export class Insight {
 
   @Column()
   type!: string;
+
+  @Column({ type: "varchar", default: InsightPhase.Live })
+  phase!: InsightPhase;
 
   @Column({ type: "varchar" })
   scope!: InsightScope;

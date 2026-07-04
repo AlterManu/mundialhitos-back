@@ -1,7 +1,7 @@
 import { isGoalScoredEvent } from "@/domain/live/LiveEvent";
 import { InsightImportance } from "@/domain/insights/InsightImportance";
 import { InsightRule, InsightRuleContext } from "@/domain/insights/InsightRule";
-import { InsightScope } from "@/entities/Insight";
+import { InsightPhase, InsightScope } from "@/entities/Insight";
 
 const TEAM_GOAL_MILESTONES = new Set([10, 25, 50, 75, 100, 150, 200, 250, 300]);
 
@@ -18,6 +18,7 @@ export class TeamGoalMilestoneRule implements InsightRule {
     return [
       {
         type: this.id,
+        phase: InsightPhase.Live,
         scope: InsightScope.Team,
         subjectId: event.teamId,
         matchId: event.matchId,
