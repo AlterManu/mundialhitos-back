@@ -6,6 +6,7 @@ import {
 } from "@/entities/LiveEventLog";
 import { InsightEngine } from "@/application/insights/InsightEngine";
 import { InsightPersistenceService } from "@/application/insights/InsightPersistenceService";
+import { InsightContextBuilder } from "@/application/insights/InsightContextBuilder";
 import { StatisticsProjectionUpdater } from "@/application/statistics/StatisticsProjectionUpdater";
 import { Insight } from "@/entities/Insight";
 
@@ -18,6 +19,7 @@ export interface LiveEventProcessingResult {
 export class LiveEventProcessor {
   private readonly eventRepo: Repository<LiveEventLog>;
   private readonly statsUpdater: StatisticsProjectionUpdater;
+  private readonly contextBuilder: InsightContextBuilder;
   private readonly insightPersistence: InsightPersistenceService;
 
   constructor(
@@ -26,6 +28,7 @@ export class LiveEventProcessor {
   ) {
     this.eventRepo = dataSource.getRepository(LiveEventLog);
     this.statsUpdater = new StatisticsProjectionUpdater(dataSource);
+    this.contextBuilder = new InsightContextBuilder(dataSource);
     this.insightPersistence = new InsightPersistenceService(dataSource);
   }
 
@@ -60,6 +63,7 @@ export class LiveEventProcessor {
 
     try {
       const statistics = await this.statsUpdater.apply(event);
+      statistics.context = await this.contextBuilder.build(event, statistics);
       const candidates = this.insightEngine.evaluate(event, statistics);
       const insights = await this.insightPersistence.saveCandidates(
         candidates,

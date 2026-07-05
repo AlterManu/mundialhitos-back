@@ -14,6 +14,7 @@ import fs from "fs";
 import { RebuildStatisticsService } from "@/application/statistics/RebuildStatisticsService";
 import { Insight } from "@/entities/Insight";
 import { LiveEventLog } from "@/entities/LiveEventLog";
+import { PlayerAppearance } from "@/entities/PlayerAppearance";
 
 export interface ApiFootballSimulationResult {
   importedFixtures: number;
@@ -85,6 +86,9 @@ export class ApiFootballSimulationService {
       match_id: internalMatchId,
     });
     await this.dataSource.getRepository(LiveEventLog).delete({
+      match_id: internalMatchId,
+    });
+    await this.dataSource.getRepository(PlayerAppearance).delete({
       match_id: internalMatchId,
     });
     await new RebuildStatisticsService(this.dataSource).rebuild();

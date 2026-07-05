@@ -1,7 +1,12 @@
 import { LiveEvent } from "@/domain/live/LiveEvent";
 import { LiveEventKind } from "@/entities/LiveEventLog";
 import { MappedEntityType } from "@/entities/ExternalIdMapping";
-import { ApiFootballFixtureDto, ApiFootballFixtureEventDto } from "./ApiFootballTypes";
+import {
+  ApiFootballFixtureDto,
+  ApiFootballFixtureEventDto,
+  ApiFootballLineupDto,
+  ApiFootballLineupPlayerDto,
+} from "./ApiFootballTypes";
 import { ExternalIdMappingResolver } from "./ExternalIdMappingResolver";
 
 const API_FOOTBALL_PROVIDER = "api-football";
@@ -27,9 +32,13 @@ export class ApiFootballLiveEventMapper {
 
     if (!homeTeamId || !awayTeamId) return [];
 
-    const events = fixture.events ?? [];
     const normalized: LiveEvent[] = [];
 
+    normalized.push(
+      ...(await this.mapStartingLineups(fixture, matchId, homeTeamId, awayTeamId)),
+    );
+
+    const events = fixture.events ?? [];
     for (const [index, event] of events.entries()) {
       const mapped = await this.mapEvent(
         fixture,
@@ -43,6 +52,83 @@ export class ApiFootballLiveEventMapper {
     }
 
     return normalized;
+  }
+
+  private async mapStartingLineups(
+    fixture: ApiFootballFixtureDto,
+    matchId: string,
+    homeTeamId: string,
+    awayTeamId: string,
+  ): Promise<LiveEvent[]> {
+    const events: LiveEvent[] = [];
+    const lineups = fixture.lineups ?? [];
+
+    for (const lineup of lineups) {
+      const teamId = await this.idResolver.resolve(
+        MappedEntityType.Team,
+        lineup.team.id,
+      );
+      if (!teamId) continue;
+      const opponentId =
+        teamId === homeTeamId ? awayTeamId : teamId === awayTeamId ? homeTeamId : null;
+
+      for (const [playerIndex, player] of (lineup.startXI ?? []).entries()) {
+        const mapped = await this.mapLineupPlayer(
+          fixture,
+          lineup,
+          player,
+          playerIndex,
+          matchId,
+          teamId,
+          opponentId,
+        );
+        if (mapped) events.push(mapped);
+      }
+    }
+
+    return events;
+  }
+
+  private async mapLineupPlayer(
+    fixture: ApiFootballFixtureDto,
+    lineup: ApiFootballLineupDto,
+    lineupPlayer: ApiFootballLineupPlayerDto,
+    playerIndex: number,
+    matchId: string,
+    teamId: string,
+    opponentId: string | null,
+  ): Promise<LiveEvent | null> {
+    const playerId = await this.idResolver.resolve(
+      MappedEntityType.Player,
+      lineupPlayer.player.id,
+    );
+    if (!playerId) return null;
+
+    return {
+      identity: {
+        provider: API_FOOTBALL_PROVIDER,
+        providerEventId: `${fixture.fixture.id}:lineup:start:${lineup.team.id}:${lineupPlayer.player.id ?? playerIndex}`,
+        sequenceNumber: -1000 + playerIndex,
+      },
+      kind: LiveEventKind.LineupConfirmed,
+      matchId,
+      teamId,
+      opponentId,
+      playerId,
+      assistPlayerId: null,
+      minute: 0,
+      additionalMinute: null,
+      occurredAt: fixture.fixture.date,
+      detail: "Starting XI",
+      payload: {
+        type: "Lineup",
+        detail: "Starting XI",
+        team: lineup.team,
+        player: lineupPlayer.player,
+        formation: lineup.formation ?? null,
+        starter: true,
+      },
+    };
   }
 
   private async mapEvent(

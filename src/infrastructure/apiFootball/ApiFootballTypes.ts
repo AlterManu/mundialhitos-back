@@ -22,6 +22,28 @@ export interface ApiFootballFixtureEventDto {
   comments: string | null;
 }
 
+export interface ApiFootballLineupPlayerDto {
+  player: {
+    id: number | null;
+    name: string | null;
+    number: number | null;
+    pos: string | null;
+    grid: string | null;
+  };
+}
+
+export interface ApiFootballLineupDto {
+  team: ApiFootballTeamRef;
+  coach?: {
+    id: number | null;
+    name: string | null;
+    photo?: string | null;
+  };
+  formation?: string | null;
+  startXI?: ApiFootballLineupPlayerDto[];
+  substitutes?: ApiFootballLineupPlayerDto[];
+}
+
 export interface ApiFootballFixtureDto {
   fixture: {
     id: number;
@@ -73,7 +95,7 @@ export interface ApiFootballFixtureDto {
     };
   };
   events?: ApiFootballFixtureEventDto[];
-  lineups?: unknown[];
+  lineups?: ApiFootballLineupDto[];
   statistics?: unknown[];
   players?: unknown[];
 }
