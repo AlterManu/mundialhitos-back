@@ -69,6 +69,44 @@ mappingRoutes.post("/", async (req, res, next) => {
   }
 });
 
+mappingRoutes.get("/review", async (req, res, next) => {
+  try {
+    const repo = AppDataSource.getRepository(ExternalIdMapping);
+    const entityType = parseEntityType(req.query.entityType);
+    const confidence =
+      typeof req.query.confidence === "string" ? req.query.confidence : "low";
+    const status =
+      typeof req.query.status === "string" ? req.query.status : undefined;
+
+    const query = repo
+      .createQueryBuilder("mapping")
+      .where("mapping.provider = :provider", {
+        provider: ExternalProvider.ApiFootball,
+      })
+      .orderBy("mapping.entity_type", "ASC")
+      .addOrderBy("mapping.external_id", "ASC")
+      .take(parseLimit(req.query.limit, 500));
+
+    if (entityType) {
+      query.andWhere("mapping.entity_type = :entityType", { entityType });
+    }
+
+    if (confidence) {
+      query.andWhere("mapping.metadata->>'confidence' = :confidence", {
+        confidence,
+      });
+    }
+
+    if (status) {
+      query.andWhere("mapping.metadata->>'status' = :status", { status });
+    }
+
+    res.json({ data: await query.getMany() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 mappingRoutes.get("/coverage", async (req, res, next) => {
   try {
     const season =
@@ -95,6 +133,24 @@ mappingRoutes.get("/coverage", async (req, res, next) => {
       provider: ExternalProvider.ApiFootball,
       entity_type: MappedEntityType.Match,
     });
+    const lowConfidenceMappings = await mappingRepo
+      .createQueryBuilder("mapping")
+      .where("mapping.provider = :provider", {
+        provider: ExternalProvider.ApiFootball,
+      })
+      .andWhere("mapping.metadata->>'confidence' = :confidence", {
+        confidence: "low",
+      })
+      .getCount();
+    const createdMappings = await mappingRepo
+      .createQueryBuilder("mapping")
+      .where("mapping.provider = :provider", {
+        provider: ExternalProvider.ApiFootball,
+      })
+      .andWhere("mapping.metadata->>'status' = :status", {
+        status: "created",
+      })
+      .getCount();
     const eventsWithUnresolvedPlayers = await eventRepo.countBy({
       player_id: IsNull(),
     });
@@ -115,6 +171,8 @@ mappingRoutes.get("/coverage", async (req, res, next) => {
           teams: teamMappings,
           players: playerMappings,
           matches: matchMappings,
+          lowConfidence: lowConfidenceMappings,
+          createdFromApi: createdMappings,
         },
         eventsWithUnresolvedPlayers,
       },

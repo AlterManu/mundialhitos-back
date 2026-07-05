@@ -23,6 +23,12 @@ export class ApiFootballClient {
     return response.response[0] ?? null;
   }
 
+  async getFixtures(leagueId: number, season: number) {
+    return this.request<ApiFootballFixtureDto>(
+      `/fixtures?league=${leagueId}&season=${season}`,
+    );
+  }
+
   async getLiveFixtures(leagueId: number, season: number) {
     return this.request<ApiFootballFixtureDto>(
       `/fixtures?live=all&league=${leagueId}&season=${season}`,

@@ -13,6 +13,7 @@ import { liveRoutes } from "@/routes/liveRoutes";
 import { pollingRoutes } from "@/routes/pollingRoutes";
 import { devRoutes } from "@/routes/devRoutes";
 import { mappingRoutes } from "@/routes/mappingRoutes";
+import { adminRoutes } from "@/routes/adminRoutes";
 // import userRoutes from "@/routes/users";
 
 const app: express.Application = express();
@@ -29,6 +30,7 @@ app.use("/api/insights", insightRoutes);
 app.use("/api/live", liveRoutes);
 app.use("/api/mappings", mappingRoutes);
 app.use("/api/polling", pollingRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/dev", devRoutes);
 // app.use("/api/users", userRoutes);
 
