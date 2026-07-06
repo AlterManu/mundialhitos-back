@@ -1,4 +1,5 @@
 import { isGoalScoredEvent } from "@/domain/live/LiveEvent";
+import { InsightCandidate } from "@/domain/insights/InsightCandidate";
 import { InsightImportance } from "@/domain/insights/InsightImportance";
 import { InsightRule, InsightRuleContext } from "@/domain/insights/InsightRule";
 import { InsightPhase, InsightScope } from "@/entities/Insight";
@@ -10,7 +11,7 @@ export class PenaltyInsightRule implements InsightRule {
   evaluate(context: InsightRuleContext) {
     const { event, statistics } = context;
     const goalContext = statistics.context?.goal;
-    const insights = [];
+    const insights: InsightCandidate[] = [];
 
     if (isGoalScoredEvent(event) && event.penalty && goalContext) {
       insights.push({
@@ -28,7 +29,7 @@ export class PenaltyInsightRule implements InsightRule {
           goalContext.penaltyGoalsAfter === 1
             ? "Primer penal convertido"
             : "Nuevo gol de penal",
-        body: `El jugador ${event.playerId} suma ${goalContext.penaltyGoalsAfter} gol(es) de penal en Mundiales.`,
+        body: `${goalContext.playerName} suma ${goalContext.penaltyGoalsAfter} gol(es) de penal en Mundiales.`,
         facts: {
           playerId: event.playerId,
           penaltyGoalsBefore: goalContext.penaltyGoalsBefore,
@@ -52,7 +53,7 @@ export class PenaltyInsightRule implements InsightRule {
         dedupeKey: `${this.id}:missed:${event.matchId}:${event.identity.sequenceNumber}`,
         importanceScore: InsightImportance.High,
         title: "Penal fallado",
-        body: `El jugador ${event.playerId} falló un penal en Mundial.`,
+        body: `${payloadPlayerName(event.payload)} fallo un penal en Mundial.`,
         facts: {
           playerId: event.playerId,
           teamId: event.teamId,
@@ -64,4 +65,14 @@ export class PenaltyInsightRule implements InsightRule {
 
     return insights;
   }
+}
+
+function payloadPlayerName(payload: Record<string, unknown>) {
+  const player =
+    typeof payload.player === "object" && payload.player !== null
+      ? (payload.player as Record<string, unknown>)
+      : {};
+  return typeof player.name === "string" && player.name.trim()
+    ? player.name
+    : "El ejecutante";
 }

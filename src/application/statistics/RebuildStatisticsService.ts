@@ -1,4 +1,6 @@
 import { DataSource, Repository } from "typeorm";
+import { Assist } from "@/entities/Assist";
+import { Card } from "@/entities/Card";
 import { Goal } from "@/entities/Goal";
 import { GoalkeeperTournamentStat } from "@/entities/GoalkeeperTournamentStat";
 import { Match } from "@/entities/Match";
@@ -10,6 +12,7 @@ import { PlayerMatchGoalStat } from "@/entities/PlayerMatchGoalStat";
 import { PlayerOpponentStats } from "@/entities/PlayerOpponentStats";
 import { PlayerAppearance } from "@/entities/PlayerAppearance";
 import { PlayerStats } from "@/entities/PlayerStats";
+import { PlayerTournamentStat } from "@/entities/PlayerTournamentStat";
 import { TeamOpponentStats } from "@/entities/TeamOpponentStats";
 import { TeamStats } from "@/entities/TeamStats";
 import { TeamTournamentStat } from "@/entities/TeamTournamentStat";
@@ -27,11 +30,14 @@ export interface RebuildStatisticsResult {
   teamTournamentStats: number;
   teamWorldCupTitles: number;
   goalkeeperTournamentStats: number;
+  playerTournamentStats: number;
 }
 
 export class RebuildStatisticsService {
   private readonly matchRepo: Repository<Match>;
   private readonly goalRepo: Repository<Goal>;
+  private readonly assistRepo: Repository<Assist>;
+  private readonly cardRepo: Repository<Card>;
   private readonly playerStatsRepo: Repository<PlayerStats>;
   private readonly playerAppearanceRepo: Repository<PlayerAppearance>;
   private readonly playerOpponentStatsRepo: Repository<PlayerOpponentStats>;
@@ -39,6 +45,7 @@ export class RebuildStatisticsService {
   private readonly teamOpponentStatsRepo: Repository<TeamOpponentStats>;
   private readonly playerMatchGoalStatRepo: Repository<PlayerMatchGoalStat>;
   private readonly playerGoalRankingRepo: Repository<PlayerGoalRanking>;
+  private readonly playerTournamentStatRepo: Repository<PlayerTournamentStat>;
   private readonly teamTournamentStatRepo: Repository<TeamTournamentStat>;
   private readonly teamWorldCupTitleRepo: Repository<TeamWorldCupTitle>;
   private readonly goalkeeperTournamentStatRepo: Repository<GoalkeeperTournamentStat>;
@@ -46,6 +53,8 @@ export class RebuildStatisticsService {
   constructor(private readonly dataSource: DataSource) {
     this.matchRepo = dataSource.getRepository(Match);
     this.goalRepo = dataSource.getRepository(Goal);
+    this.assistRepo = dataSource.getRepository(Assist);
+    this.cardRepo = dataSource.getRepository(Card);
     this.playerStatsRepo = dataSource.getRepository(PlayerStats);
     this.playerAppearanceRepo = dataSource.getRepository(PlayerAppearance);
     this.playerOpponentStatsRepo = dataSource.getRepository(PlayerOpponentStats);
@@ -53,6 +62,7 @@ export class RebuildStatisticsService {
     this.teamOpponentStatsRepo = dataSource.getRepository(TeamOpponentStats);
     this.playerMatchGoalStatRepo = dataSource.getRepository(PlayerMatchGoalStat);
     this.playerGoalRankingRepo = dataSource.getRepository(PlayerGoalRanking);
+    this.playerTournamentStatRepo = dataSource.getRepository(PlayerTournamentStat);
     this.teamTournamentStatRepo = dataSource.getRepository(TeamTournamentStat);
     this.teamWorldCupTitleRepo = dataSource.getRepository(TeamWorldCupTitle);
     this.goalkeeperTournamentStatRepo =
@@ -67,6 +77,7 @@ export class RebuildStatisticsService {
       await this.teamStatsRepo.clear();
       await this.playerMatchGoalStatRepo.clear();
       await this.playerGoalRankingRepo.clear();
+      await this.playerTournamentStatRepo.clear();
       await this.teamTournamentStatRepo.clear();
       await this.teamWorldCupTitleRepo.clear();
       await this.goalkeeperTournamentStatRepo.clear();
@@ -74,6 +85,8 @@ export class RebuildStatisticsService {
 
     const matches = await this.matchRepo.find();
     const goals = await this.goalRepo.find();
+    const assists = await this.assistRepo.find();
+    const cards = await this.cardRepo.find();
     const playerAppearances = await this.playerAppearanceRepo.find();
 
     const playerStats = new Map<string, PlayerStats>();
@@ -81,6 +94,7 @@ export class RebuildStatisticsService {
     const teamStats = new Map<string, TeamStats>();
     const teamOpponentStats = new Map<string, TeamOpponentStats>();
     const playerMatchGoalStats = new Map<string, PlayerMatchGoalStat>();
+    const playerTournamentStats = new Map<string, PlayerTournamentStat>();
     const teamTournamentStats = new Map<string, TeamTournamentStat>();
     const goalkeeperTournamentStats = new Map<string, GoalkeeperTournamentStat>();
     const matchesById = new Map(matches.map((match) => [match.match_id, match]));
@@ -162,6 +176,16 @@ export class RebuildStatisticsService {
       const player = getOrCreate(playerStats, goal.scored_by_player, () =>
         this.playerStatsRepo.create({ player_id: goal.scored_by_player }),
       );
+      const playerTournament = getOrCreate(
+        playerTournamentStats,
+        `${goal.world_cup_year}:${goal.scored_by_player}`,
+        () =>
+          this.playerTournamentStatRepo.create({
+            tournament_id: String(goal.world_cup_year),
+            world_cup_year: goal.world_cup_year,
+            player_id: goal.scored_by_player,
+          }),
+      );
 
       if (goal.own_goal) {
         player.own_goals += 1;
@@ -174,6 +198,7 @@ export class RebuildStatisticsService {
       }
 
       player.world_cup_goals += 1;
+      playerTournament.goals += 1;
       if (goal.penalty) player.penalties_scored += 1;
 
       const key = `${goal.scored_by_player}:${opponentId}`;
@@ -194,6 +219,54 @@ export class RebuildStatisticsService {
       if (goal.penalty) matchGoalStat.penalties_scored += 1;
     }
 
+    for (const assist of assists) {
+      const match = matchesById.get(assist.match_id);
+      const year = match?.world_cup_year ?? Number(assist.tournament_id);
+      if (!Number.isInteger(year)) continue;
+      const player = getOrCreate(playerStats, assist.player_id, () =>
+        this.playerStatsRepo.create({ player_id: assist.player_id }),
+      );
+      player.assists += 1;
+      const tournament = getOrCreate(
+        playerTournamentStats,
+        `${year}:${assist.player_id}`,
+        () =>
+          this.playerTournamentStatRepo.create({
+            tournament_id: String(year),
+            world_cup_year: year,
+            player_id: assist.player_id,
+          }),
+      );
+      tournament.assists += 1;
+    }
+
+    for (const card of cards) {
+      const match = matchesById.get(card.match_id);
+      const year = match?.world_cup_year ?? Number(card.tournament_id);
+      if (!Number.isInteger(year)) continue;
+      const player = getOrCreate(playerStats, card.player_id, () =>
+        this.playerStatsRepo.create({ player_id: card.player_id }),
+      );
+      const tournament = getOrCreate(
+        playerTournamentStats,
+        `${year}:${card.player_id}`,
+        () =>
+          this.playerTournamentStatRepo.create({
+            tournament_id: String(year),
+            world_cup_year: year,
+            player_id: card.player_id,
+          }),
+      );
+      if (card.yellow_card || card.second_yellow_card) {
+        player.yellow_cards += 1;
+        tournament.yellow_cards += 1;
+      }
+      if (card.red_card || card.second_yellow_card) {
+        player.red_cards += 1;
+        tournament.red_cards += 1;
+      }
+    }
+
     const titles = this.buildWorldCupTitles(matches);
     this.applyGoalkeeperStats(playerAppearances, matchesById, goalkeeperTournamentStats);
     const rankings = this.buildGoalRankings([...playerMatchGoalStats.values()]);
@@ -204,6 +277,7 @@ export class RebuildStatisticsService {
     await this.playerOpponentStatsRepo.save([...playerOpponentStats.values()]);
     await this.playerMatchGoalStatRepo.save([...playerMatchGoalStats.values()]);
     await this.playerGoalRankingRepo.save(rankings);
+    await this.playerTournamentStatRepo.save([...playerTournamentStats.values()]);
     await this.teamTournamentStatRepo.save([...teamTournamentStats.values()]);
     await this.teamWorldCupTitleRepo.save(titles);
     await this.goalkeeperTournamentStatRepo.save([
@@ -222,6 +296,7 @@ export class RebuildStatisticsService {
       teamTournamentStats: teamTournamentStats.size,
       teamWorldCupTitles: titles.length,
       goalkeeperTournamentStats: goalkeeperTournamentStats.size,
+      playerTournamentStats: playerTournamentStats.size,
     };
   }
 

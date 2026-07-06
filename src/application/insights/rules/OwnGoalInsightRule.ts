@@ -28,7 +28,7 @@ export class OwnGoalInsightRule implements InsightRule {
           goalContext.ownGoalsAfter === 1
             ? "Primer gol en contra"
             : "Otro gol en contra",
-        body: `El jugador ${event.playerId} suma ${goalContext.ownGoalsAfter} gol(es) en contra en Mundiales.`,
+        body: `${goalContext.playerName} suma ${goalContext.ownGoalsAfter} gol(es) en contra en Mundiales.`,
         facts: {
           playerId: event.playerId,
           ownGoalsBefore: goalContext.ownGoalsBefore,
@@ -46,8 +46,8 @@ export class OwnGoalInsightRule implements InsightRule {
         matchId: event.matchId,
         dedupeKey: `${this.id}:ranking:${event.playerId}:${goalContext.ownGoalRankAfter}`,
         importanceScore: InsightImportance.Medium,
-        title: "Entre los que más goles en contra tienen",
-        body: `El jugador ${event.playerId} queda en el puesto ${goalContext.ownGoalRankAfter} histórico de goles en contra en Mundiales.`,
+        title: "Entre los que mas goles en contra tienen",
+        body: `${goalContext.playerName} queda en el puesto ${goalContext.ownGoalRankAfter} historico de goles en contra en Mundiales.`,
         facts: {
           playerId: event.playerId,
           rankAfter: goalContext.ownGoalRankAfter,

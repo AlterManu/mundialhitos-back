@@ -8,7 +8,10 @@ export class FirstWorldCupGoalRule implements InsightRule {
 
   evaluate(context: InsightRuleContext) {
     const { event, statistics } = context;
-    if (!isGoalScoredEvent(event) || event.ownGoal || !statistics.goal) return [];
+    const goalContext = statistics.context?.goal;
+    if (!isGoalScoredEvent(event) || event.ownGoal || !statistics.goal || !goalContext) {
+      return [];
+    }
 
     const previousGoals = statistics.goal.playerBefore?.world_cup_goals ?? 0;
     if (previousGoals !== 0) return [];
@@ -23,7 +26,7 @@ export class FirstWorldCupGoalRule implements InsightRule {
         dedupeKey: `${this.id}:${event.playerId}`,
         importanceScore: InsightImportance.High,
         title: "Primer gol mundialista",
-        body: `El jugador ${event.playerId} marcó su primer gol en una Copa del Mundo.`,
+        body: `${goalContext.playerName} marco su primer gol en una Copa del Mundo.`,
         facts: {
           playerId: event.playerId,
           teamId: event.teamId,

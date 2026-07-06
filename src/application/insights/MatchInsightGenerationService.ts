@@ -4,6 +4,7 @@ import { InsightImportance } from "@/domain/insights/InsightImportance";
 import { ApiFootballFixture } from "@/entities/ApiFootballFixture";
 import { Insight, InsightPhase, InsightScope } from "@/entities/Insight";
 import { Match } from "@/entities/Match";
+import { Player } from "@/entities/Player";
 import { PlayerAppearance } from "@/entities/PlayerAppearance";
 import { TeamOpponentStats } from "@/entities/TeamOpponentStats";
 import { TeamTournamentStat } from "@/entities/TeamTournamentStat";
@@ -13,6 +14,7 @@ import { InsightPersistenceService } from "./InsightPersistenceService";
 export class MatchInsightGenerationService {
   private readonly fixtureRepo: Repository<ApiFootballFixture>;
   private readonly matchRepo: Repository<Match>;
+  private readonly playerRepo: Repository<Player>;
   private readonly playerAppearanceRepo: Repository<PlayerAppearance>;
   private readonly teamOpponentStatsRepo: Repository<TeamOpponentStats>;
   private readonly teamTournamentStatsRepo: Repository<TeamTournamentStat>;
@@ -22,6 +24,7 @@ export class MatchInsightGenerationService {
   constructor(dataSource: DataSource) {
     this.fixtureRepo = dataSource.getRepository(ApiFootballFixture);
     this.matchRepo = dataSource.getRepository(Match);
+    this.playerRepo = dataSource.getRepository(Player);
     this.playerAppearanceRepo = dataSource.getRepository(PlayerAppearance);
     this.teamOpponentStatsRepo = dataSource.getRepository(TeamOpponentStats);
     this.teamTournamentStatsRepo = dataSource.getRepository(TeamTournamentStat);
@@ -83,7 +86,7 @@ export class MatchInsightGenerationService {
       fixture.away_local_team_id,
       { stageName: fixture.round },
     );
-    if (fixture.round && sameStageMeetings.length === 0) {
+    if (headToHead?.matches && fixture.round && sameStageMeetings.length === 0) {
       candidates.push({
         type: "pre-first-stage-meeting",
         phase: InsightPhase.PreMatch,
@@ -412,7 +415,7 @@ export class MatchInsightGenerationService {
         dedupeKey: `post-goalkeeper-clean-sheet-streak:${fixture.internal_match_id}:${goalkeeper.player_id}:${streak}`,
         importanceScore: streak >= 4 ? InsightImportance.High : InsightImportance.Medium,
         title: "Arquero en racha sin recibir goles",
-        body: `El arquero ${goalkeeper.player_id} acumula ${streak} partidos mundialistas consecutivos sin recibir goles.`,
+        body: `${await this.playerName(goalkeeper.player_id)} acumula ${streak} partidos mundialistas consecutivos sin recibir goles.`,
         facts: {
           goalkeeperId: goalkeeper.player_id,
           teamId: team.localTeamId,
@@ -428,8 +431,11 @@ export class MatchInsightGenerationService {
   ): Promise<InsightCandidate[]> {
     const candidates: InsightCandidate[] = [];
     for (const team of teamsFromFixture(fixture)) {
-      const tournamentGoals = await this.goalsForInApiTournament(
-        fixture.season,
+      if (!(await this.isGroupStageCompleteForTeam(fixture, team.localTeamId))) {
+        continue;
+      }
+      const tournamentGoals = await this.goalsForMaterializedTournamentIncludingFixture(
+        fixture,
         team.localTeamId,
       );
       if (tournamentGoals !== 0) continue;
@@ -456,34 +462,21 @@ export class MatchInsightGenerationService {
     const candidates: InsightCandidate[] = [];
 
     for (const team of teamsFromFixture(fixture)) {
-      if (!(await this.isGroupStageCompleteForTeam(fixture.season, team.localTeamId))) {
+      if (!(await this.isGroupStageCompleteForTeam(fixture, team.localTeamId))) {
         continue;
       }
-      if (await this.hasApiKnockoutFixture(fixture.season, team.localTeamId)) {
+      if (await this.hasMaterializedKnockoutMatch(fixture.season, team.localTeamId)) {
         continue;
       }
 
       const previousTournaments = await this.teamTournamentStatsRepo.find({
         where: { team_id: team.localTeamId },
       });
-      const previousGroupExits = previousTournaments.filter(
-        (stat) => !stat.reached_knockout,
+      const previousKnockoutAppearances = previousTournaments.filter(
+        (stat) => stat.reached_knockout,
       );
 
-      if (previousTournaments.length === 0) {
-        candidates.push({
-          type: "post-first-world-cup-group-exit",
-          phase: InsightPhase.PostMatch,
-          scope: InsightScope.Team,
-          subjectId: team.localTeamId,
-          matchId: fixture.internal_match_id,
-          dedupeKey: `post-first-world-cup-group-exit:${fixture.season}:${team.localTeamId}`,
-          importanceScore: InsightImportance.Medium,
-          title: "Debut mundialista sin eliminatorias",
-          body: `${team.name} disputa su primer Mundial y no logra clasificar a eliminatorias.`,
-          facts: { teamId: team.localTeamId, season: fixture.season },
-        });
-      } else if (previousGroupExits.length === 0) {
+      if (previousKnockoutAppearances.length > 0) {
         candidates.push({
           type: "post-first-group-stage-elimination",
           phase: InsightPhase.PostMatch,
@@ -497,7 +490,7 @@ export class MatchInsightGenerationService {
           facts: {
             teamId: team.localTeamId,
             season: fixture.season,
-            previousTournaments: previousTournaments.length,
+            previousKnockoutAppearances: previousKnockoutAppearances.length,
           },
         });
       }
@@ -602,13 +595,28 @@ export class MatchInsightGenerationService {
     return streak;
   }
 
-  private async goalsForInApiTournament(season: number, teamId: string) {
-    const fixtures = await this.fixtureRepo.find({ where: { season } });
-    return fixtures.reduce((sum, fixture) => {
-      if (fixture.home_local_team_id === teamId) return sum + (fixture.home_goals ?? 0);
-      if (fixture.away_local_team_id === teamId) return sum + (fixture.away_goals ?? 0);
+  private async goalsForMaterializedTournamentIncludingFixture(
+    fixture: ApiFootballFixture,
+    teamId: string,
+  ) {
+    const matches = await this.matchRepo.find({
+      where: { world_cup_year: fixture.season },
+    });
+    const materializedGoals = matches.reduce((sum, match) => {
+      if (match.home_team_id === teamId) return sum + match.home_score;
+      if (match.away_team_id === teamId) return sum + match.away_score;
       return sum;
     }, 0);
+    const currentGoals =
+      fixture.home_local_team_id === teamId
+        ? fixture.home_goals ?? 0
+        : fixture.away_local_team_id === teamId
+          ? fixture.away_goals ?? 0
+          : 0;
+    const alreadyMaterialized = matches.some(
+      (match) => match.match_id === fixture.internal_match_id,
+    );
+    return materializedGoals + (alreadyMaterialized ? 0 : currentGoals);
   }
 
   private async findMatchGoalkeeper(matchId: string, teamId: string) {
@@ -666,26 +674,42 @@ export class MatchInsightGenerationService {
     return streak;
   }
 
-  private async isGroupStageCompleteForTeam(season: number, teamId: string) {
-    const fixtures = await this.fixtureRepo.find({ where: { season } });
-    const groupFixtures = fixtures.filter(
-      (fixture) =>
-        isGroupStage(fixture.round) &&
-        (fixture.home_local_team_id === teamId || fixture.away_local_team_id === teamId),
-    );
+  private async isGroupStageCompleteForTeam(
+    fixture: ApiFootballFixture,
+    teamId: string,
+  ) {
+    const playedGroupMatches = await this.matchRepo
+      .createQueryBuilder("match")
+      .where("match.world_cup_year = :season", { season: fixture.season })
+      .andWhere("LOWER(match.stage_name) LIKE :group", { group: "%group%" })
+      .andWhere("(match.home_team_id = :teamId OR match.away_team_id = :teamId)", {
+        teamId,
+      })
+      .getCount();
+    const currentFixtureAddsOne =
+      isGroupStage(fixture.round) &&
+      (fixture.home_local_team_id === teamId || fixture.away_local_team_id === teamId)
+        ? 1
+        : 0;
+    return playedGroupMatches + currentFixtureAddsOne >= 3;
+  }
+
+  private async hasMaterializedKnockoutMatch(season: number, teamId: string) {
     return (
-      groupFixtures.length > 0 &&
-      groupFixtures.every((fixture) => isFinishedStatus(fixture.status_short))
+      (await this.matchRepo
+        .createQueryBuilder("match")
+        .where("match.world_cup_year = :season", { season })
+        .andWhere("LOWER(match.stage_name) NOT LIKE :group", { group: "%group%" })
+        .andWhere("(match.home_team_id = :teamId OR match.away_team_id = :teamId)", {
+          teamId,
+        })
+        .getCount()) > 0
     );
   }
 
-  private async hasApiKnockoutFixture(season: number, teamId: string) {
-    const fixtures = await this.fixtureRepo.find({ where: { season } });
-    return fixtures.some(
-      (fixture) =>
-        !isGroupStage(fixture.round) &&
-        (fixture.home_local_team_id === teamId || fixture.away_local_team_id === teamId),
-    );
+  private async playerName(playerId: string) {
+    const player = await this.playerRepo.findOneBy({ player_id: playerId });
+    return `${player?.name ?? ""} ${player?.lastname ?? ""}`.trim() || playerId;
   }
 }
 

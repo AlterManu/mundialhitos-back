@@ -25,7 +25,7 @@ export class TeamConcededThresholdRule implements InsightRule {
         importanceScore:
           conceded >= 5 ? InsightImportance.Historic : InsightImportance.High,
         title: `Le marcan ${conceded} goles`,
-        body: `${event.opponentId} ya recibió ${conceded} goles en este partido mundialista.`,
+        body: `${goalContext.opponentName} ya recibio ${conceded} goles en este partido mundialista.`,
         facts: {
           teamId: event.opponentId,
           conceded,

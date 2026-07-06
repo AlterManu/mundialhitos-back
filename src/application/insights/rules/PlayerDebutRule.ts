@@ -13,7 +13,8 @@ export class PlayerDebutRule implements InsightRule {
         context.event.kind,
       ) ||
       !debut?.enteringPlayerId ||
-      debut.previousAppearances !== 0
+      debut.previousAppearances !== 0 ||
+      !debut.teamHasWorldCupTitle
     ) {
       return [];
     }
@@ -26,9 +27,9 @@ export class PlayerDebutRule implements InsightRule {
         subjectId: debut.enteringPlayerId,
         matchId: context.event.matchId,
         dedupeKey: `${this.id}:${debut.enteringPlayerId}`,
-        importanceScore: InsightImportance.Medium,
+        importanceScore: InsightImportance.Low,
         title: "Debut mundialista",
-        body: `El jugador ${debut.enteringPlayerId} disputa sus primeros minutos en una Copa del Mundo.`,
+        body: `${debut.enteringPlayerName} disputa sus primeros minutos mundialistas con ${debut.teamName}.`,
         facts: {
           playerId: debut.enteringPlayerId,
           teamId: context.event.teamId,

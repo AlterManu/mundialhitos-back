@@ -216,6 +216,7 @@ function emptyMaterializationResult(): ApiFootballHistoricalMaterializationResul
   return {
     materializedMatches: 0,
     goals: 0,
+    assists: 0,
     cards: 0,
     substitutions: 0,
     penaltyKicks: 0,
@@ -230,6 +231,7 @@ function addMaterializationResult(
 ) {
   target.materializedMatches += incoming.materializedMatches;
   target.goals += incoming.goals;
+  target.assists += incoming.assists;
   target.cards += incoming.cards;
   target.substitutions += incoming.substitutions;
   target.penaltyKicks += incoming.penaltyKicks;

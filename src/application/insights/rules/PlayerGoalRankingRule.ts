@@ -1,4 +1,5 @@
 import { isGoalScoredEvent } from "@/domain/live/LiveEvent";
+import { InsightCandidate } from "@/domain/insights/InsightCandidate";
 import { InsightImportance } from "@/domain/insights/InsightImportance";
 import { InsightRule, InsightRuleContext } from "@/domain/insights/InsightRule";
 import { InsightPhase, InsightScope } from "@/entities/Insight";
@@ -11,7 +12,7 @@ export class PlayerGoalRankingRule implements InsightRule {
     const goalContext = statistics.context?.goal;
     if (!isGoalScoredEvent(event) || event.ownGoal || !goalContext) return [];
 
-    const insights = [];
+    const insights: InsightCandidate[] = [];
     if (
       goalContext.allTimeGoalRankAfter !== null &&
       goalContext.allTimeGoalRankAfter <= 10 &&
@@ -29,8 +30,8 @@ export class PlayerGoalRankingRule implements InsightRule {
           goalContext.allTimeGoalRankAfter <= 3
             ? InsightImportance.Historic
             : InsightImportance.High,
-        title: "Sube en la tabla histórica",
-        body: `El jugador ${event.playerId} se coloca en el puesto ${goalContext.allTimeGoalRankAfter} de goleadores históricos de los Mundiales.`,
+        title: "Sube en la tabla historica",
+        body: `${goalContext.playerName} se coloca en el puesto ${goalContext.allTimeGoalRankAfter} de goleadores historicos de los Mundiales.`,
         facts: {
           playerId: event.playerId,
           rankBefore: goalContext.allTimeGoalRankBefore,
@@ -42,6 +43,7 @@ export class PlayerGoalRankingRule implements InsightRule {
     if (
       goalContext.tournamentGoalRankAfter !== null &&
       goalContext.tournamentGoalRankAfter <= 10 &&
+      goalContext.tournamentTotalGoalsAfter >= 10 &&
       (goalContext.tournamentGoalRankBefore === null ||
         goalContext.tournamentGoalRankBefore > goalContext.tournamentGoalRankAfter)
     ) {
@@ -54,11 +56,12 @@ export class PlayerGoalRankingRule implements InsightRule {
         dedupeKey: `${this.id}:tournament:${event.matchId}:${event.playerId}:${goalContext.tournamentGoalRankAfter}`,
         importanceScore: InsightImportance.Medium,
         title: "Se mete en la pelea de goleadores",
-        body: `El jugador ${event.playerId} entra en el top ${goalContext.tournamentGoalRankAfter} de goleadores de este Mundial.`,
+        body: `${goalContext.playerName} entra en el top ${goalContext.tournamentGoalRankAfter} de goleadores de este Mundial.`,
         facts: {
           playerId: event.playerId,
           rankBefore: goalContext.tournamentGoalRankBefore,
           rankAfter: goalContext.tournamentGoalRankAfter,
+          tournamentTotalGoals: goalContext.tournamentTotalGoalsAfter,
         },
       });
     }

@@ -10,15 +10,23 @@ import {
 } from "@/domain/statistics/StatisticsSnapshot";
 import { ApiFootballFixture } from "@/entities/ApiFootballFixture";
 import { LiveEventKind } from "@/entities/LiveEventLog";
+import { Player } from "@/entities/Player";
 import { PlayerAppearance } from "@/entities/PlayerAppearance";
 import { PlayerOpponentStats } from "@/entities/PlayerOpponentStats";
 import { PlayerStats } from "@/entities/PlayerStats";
+import { PlayerTournamentStat } from "@/entities/PlayerTournamentStat";
 import { TeamOpponentStats } from "@/entities/TeamOpponentStats";
 import { TeamStats } from "@/entities/TeamStats";
+import { Team } from "@/entities/Team";
+import { TeamWorldCupTitle } from "@/entities/TeamWorldCupTitle";
 
 export class StatisticsProjectionUpdater {
   private readonly playerStatsRepo: Repository<PlayerStats>;
+  private readonly playerTournamentStatRepo: Repository<PlayerTournamentStat>;
   private readonly playerAppearanceRepo: Repository<PlayerAppearance>;
+  private readonly playerRepo: Repository<Player>;
+  private readonly teamRepo: Repository<Team>;
+  private readonly teamWorldCupTitleRepo: Repository<TeamWorldCupTitle>;
   private readonly fixtureRepo: Repository<ApiFootballFixture>;
   private readonly playerOpponentStatsRepo: Repository<PlayerOpponentStats>;
   private readonly teamStatsRepo: Repository<TeamStats>;
@@ -26,7 +34,11 @@ export class StatisticsProjectionUpdater {
 
   constructor(dataSource: DataSource) {
     this.playerStatsRepo = dataSource.getRepository(PlayerStats);
+    this.playerTournamentStatRepo = dataSource.getRepository(PlayerTournamentStat);
     this.playerAppearanceRepo = dataSource.getRepository(PlayerAppearance);
+    this.playerRepo = dataSource.getRepository(Player);
+    this.teamRepo = dataSource.getRepository(Team);
+    this.teamWorldCupTitleRepo = dataSource.getRepository(TeamWorldCupTitle);
     this.fixtureRepo = dataSource.getRepository(ApiFootballFixture);
     this.playerOpponentStatsRepo = dataSource.getRepository(PlayerOpponentStats);
     this.teamStatsRepo = dataSource.getRepository(TeamStats);
@@ -39,6 +51,11 @@ export class StatisticsProjectionUpdater {
       event.kind === LiveEventKind.SubstitutionMade
     ) {
       return { appearance: await this.applyAppearance(event) };
+    }
+
+    if (event.kind === LiveEventKind.CardShown) {
+      await this.applyCard(event);
+      return {};
     }
 
     if (!isGoalScoredEvent(event)) return {};
@@ -60,6 +77,11 @@ export class StatisticsProjectionUpdater {
     if (!enteringPlayerId || !event.teamId) {
       return {
         enteringPlayerId,
+        enteringPlayerName: enteringPlayerId
+          ? await this.playerName(enteringPlayerId)
+          : null,
+        teamName: event.teamId ? await this.teamName(event.teamId) : null,
+        teamHasWorldCupTitle: false,
         previousAppearances: 0,
         previousTournamentAppearances: 0,
       };
@@ -102,12 +124,20 @@ export class StatisticsProjectionUpdater {
 
     return {
       enteringPlayerId,
+      enteringPlayerName: await this.playerName(enteringPlayerId),
+      teamName: await this.teamName(event.teamId),
+      teamHasWorldCupTitle: !!(await this.teamWorldCupTitleRepo.findOneBy({
+        team_id: event.teamId,
+      })),
       previousAppearances,
       previousTournamentAppearances,
     };
   }
 
   private async applyGoal(event: GoalScoredEvent) {
+    const fixture = await this.fixtureRepo.findOneBy({
+      internal_match_id: event.matchId,
+    });
     const playerBefore = await this.playerStatsRepo.findOneBy({
       player_id: event.playerId,
     });
@@ -123,6 +153,32 @@ export class StatisticsProjectionUpdater {
     } else {
       playerAfter.world_cup_goals += 1;
       if (event.penalty) playerAfter.penalties_scored += 1;
+    }
+    if (!event.ownGoal && fixture) {
+      const tournament = await this.getPlayerTournamentStat(
+        event.playerId,
+        fixture.season,
+      );
+      tournament.goals += 1;
+      await this.playerTournamentStatRepo.save(tournament);
+    }
+    if (!event.ownGoal && event.assistPlayerId && fixture) {
+      const assistPlayer =
+        (await this.playerStatsRepo.findOneBy({
+          player_id: event.assistPlayerId,
+        })) ??
+        this.playerStatsRepo.create({
+          player_id: event.assistPlayerId,
+        });
+      assistPlayer.assists += 1;
+      await this.playerStatsRepo.save(assistPlayer);
+
+      const assistTournament = await this.getPlayerTournamentStat(
+        event.assistPlayerId,
+        fixture.season,
+      );
+      assistTournament.assists += 1;
+      await this.playerTournamentStatRepo.save(assistTournament);
     }
 
     const playerVsOpponentBefore =
@@ -190,6 +246,56 @@ export class StatisticsProjectionUpdater {
 
   private cloneRequired<T extends object>(value: T): T {
     return { ...value } as T;
+  }
+
+  private async playerName(playerId: string) {
+    const player = await this.playerRepo.findOneBy({ player_id: playerId });
+    return `${player?.name ?? ""} ${player?.lastname ?? ""}`.trim() || playerId;
+  }
+
+  private async teamName(teamId: string) {
+    const team = await this.teamRepo.findOneBy({ team_id: teamId });
+    return team?.name_en ?? teamId;
+  }
+
+  private async applyCard(event: LiveEvent) {
+    if (!event.playerId) return;
+    const fixture = await this.fixtureRepo.findOneBy({
+      internal_match_id: event.matchId,
+    });
+    const player =
+      (await this.playerStatsRepo.findOneBy({ player_id: event.playerId })) ??
+      this.playerStatsRepo.create({ player_id: event.playerId });
+    const detail = (event.detail ?? "").toLowerCase();
+    const yellow = detail.includes("yellow");
+    const red = detail.includes("red");
+    if (yellow) player.yellow_cards += 1;
+    if (red) player.red_cards += 1;
+    await this.playerStatsRepo.save(player);
+
+    if (fixture) {
+      const tournament = await this.getPlayerTournamentStat(
+        event.playerId,
+        fixture.season,
+      );
+      if (yellow) tournament.yellow_cards += 1;
+      if (red) tournament.red_cards += 1;
+      await this.playerTournamentStatRepo.save(tournament);
+    }
+  }
+
+  private async getPlayerTournamentStat(playerId: string, season: number) {
+    return (
+      (await this.playerTournamentStatRepo.findOneBy({
+        player_id: playerId,
+        world_cup_year: season,
+      })) ??
+      this.playerTournamentStatRepo.create({
+        tournament_id: String(season),
+        world_cup_year: season,
+        player_id: playerId,
+      })
+    );
   }
 }
 

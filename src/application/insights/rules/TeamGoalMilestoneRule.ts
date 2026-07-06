@@ -10,7 +10,8 @@ export class TeamGoalMilestoneRule implements InsightRule {
 
   evaluate(context: InsightRuleContext) {
     const { event, statistics } = context;
-    if (!isGoalScoredEvent(event) || !statistics.goal) return [];
+    const goalContext = statistics.context?.goal;
+    if (!isGoalScoredEvent(event) || !statistics.goal || !goalContext) return [];
 
     const total = statistics.goal.teamAfter.goals_for;
     if (!TEAM_GOAL_MILESTONES.has(total)) return [];
@@ -24,8 +25,8 @@ export class TeamGoalMilestoneRule implements InsightRule {
         matchId: event.matchId,
         dedupeKey: `${this.id}:${event.teamId}:${total}`,
         importanceScore: total >= 100 ? InsightImportance.Historic : InsightImportance.High,
-        title: `Gol mundialista número ${total}`,
-        body: `${event.teamId} alcanzó ${total} goles en la historia de la Copa del Mundo.`,
+        title: `Gol mundialista numero ${total}`,
+        body: `${goalContext.teamName} alcanzo ${total} goles en la historia de la Copa del Mundo.`,
         facts: {
           teamId: event.teamId,
           total,

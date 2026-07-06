@@ -26,6 +26,10 @@ export interface InsightEventContext {
 }
 
 export interface GoalEventInsightContext {
+  playerName: string;
+  teamName: string;
+  opponentName: string;
+  assistPlayerName: string | null;
   currentMatchPlayerGoalsBefore: number;
   currentMatchPlayerGoalsAfter: number;
   currentMatchTeamGoalsForBefore: number;
@@ -43,6 +47,8 @@ export interface GoalEventInsightContext {
   allTimeGoalRankAfter: number | null;
   tournamentGoalRankBefore: number | null;
   tournamentGoalRankAfter: number | null;
+  tournamentTotalGoalsBefore: number;
+  tournamentTotalGoalsAfter: number;
   penaltyGoalsBefore: number;
   penaltyGoalsAfter: number;
   penaltyMissesBefore: number;
@@ -52,6 +58,7 @@ export interface GoalEventInsightContext {
   scoringStreakBefore: number;
   scoringStreakAfter: number;
   concedingGoalkeeperId: string | null;
+  concedingGoalkeeperName: string | null;
   goalkeeperTournamentGoalsConcededBefore: number;
   goalkeeperTournamentGoalsConcededAfter: number;
   goalkeeperTournamentGoalsConcededRankAfter: number | null;
@@ -59,6 +66,9 @@ export interface GoalEventInsightContext {
 
 export interface SubstitutionInsightContext {
   enteringPlayerId: string | null;
+  enteringPlayerName: string | null;
+  teamName: string | null;
+  teamHasWorldCupTitle: boolean;
   previousAppearances: number;
   previousTournamentAppearances: number;
 }

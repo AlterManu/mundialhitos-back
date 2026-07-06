@@ -15,6 +15,7 @@ import { GoalkeeperTournamentStat } from "@/entities/GoalkeeperTournamentStat";
 import { LiveEventLog, LiveEventProcessingStatus } from "@/entities/LiveEventLog";
 import { Match } from "@/entities/Match";
 import { PenaltyKick } from "@/entities/PenaltyKick";
+import { Player } from "@/entities/Player";
 import {
   PlayerGoalRanking,
   PlayerGoalRankingScope,
@@ -22,6 +23,8 @@ import {
 import { PlayerMatchGoalStat } from "@/entities/PlayerMatchGoalStat";
 import { PlayerStats } from "@/entities/PlayerStats";
 import { PlayerAppearance } from "@/entities/PlayerAppearance";
+import { Team } from "@/entities/Team";
+import { TeamWorldCupTitle } from "@/entities/TeamWorldCupTitle";
 
 export class InsightContextBuilder {
   private readonly fixtureRepo: Repository<ApiFootballFixture>;
@@ -31,6 +34,9 @@ export class InsightContextBuilder {
   private readonly penaltyRepo: Repository<PenaltyKick>;
   private readonly playerAppearanceRepo: Repository<PlayerAppearance>;
   private readonly playerStatsRepo: Repository<PlayerStats>;
+  private readonly playerRepo: Repository<Player>;
+  private readonly teamRepo: Repository<Team>;
+  private readonly teamWorldCupTitleRepo: Repository<TeamWorldCupTitle>;
   private readonly goalkeeperTournamentStatRepo: Repository<GoalkeeperTournamentStat>;
   private readonly rankingRepo: Repository<PlayerGoalRanking>;
   private readonly playerMatchGoalStatRepo: Repository<PlayerMatchGoalStat>;
@@ -43,6 +49,9 @@ export class InsightContextBuilder {
     this.penaltyRepo = dataSource.getRepository(PenaltyKick);
     this.playerAppearanceRepo = dataSource.getRepository(PlayerAppearance);
     this.playerStatsRepo = dataSource.getRepository(PlayerStats);
+    this.playerRepo = dataSource.getRepository(Player);
+    this.teamRepo = dataSource.getRepository(Team);
+    this.teamWorldCupTitleRepo = dataSource.getRepository(TeamWorldCupTitle);
     this.goalkeeperTournamentStatRepo =
       dataSource.getRepository(GoalkeeperTournamentStat);
     this.rankingRepo = dataSource.getRepository(PlayerGoalRanking);
@@ -152,8 +161,17 @@ export class InsightContextBuilder {
         : 0;
     const goalkeeperGoalsConcededAfter =
       goalkeeperGoalsConcededBefore + (concedingGoalkeeper ? 1 : 0);
+    const tournamentTotalGoalsBefore = season
+      ? await this.tournamentTotalGoalsBefore(season, event)
+      : 0;
 
     return {
+      playerName: await this.playerName(event.playerId),
+      teamName: await this.teamName(event.teamId),
+      opponentName: await this.teamName(event.opponentId),
+      assistPlayerName: event.assistPlayerId
+        ? await this.playerName(event.assistPlayerId)
+        : null,
       currentMatchPlayerGoalsBefore: playerGoalsBefore,
       currentMatchPlayerGoalsAfter: playerGoalsAfter,
       currentMatchTeamGoalsForBefore: teamGoalsBefore,
@@ -196,6 +214,8 @@ export class InsightContextBuilder {
             tournamentGoalsAfter,
           )
         : null,
+      tournamentTotalGoalsBefore,
+      tournamentTotalGoalsAfter: tournamentTotalGoalsBefore + goalAddsToPlayer,
       penaltyGoalsBefore: statistics.goal?.playerBefore?.penalties_scored ?? 0,
       penaltyGoalsAfter: statistics.goal?.playerAfter.penalties_scored ?? 0,
       penaltyMissesBefore,
@@ -206,6 +226,9 @@ export class InsightContextBuilder {
       scoringStreakAfter:
         (await this.scoringStreakBefore(event)) + (goalAddsToPlayer ? 1 : 0),
       concedingGoalkeeperId: concedingGoalkeeper?.player_id ?? null,
+      concedingGoalkeeperName: concedingGoalkeeper
+        ? await this.playerName(concedingGoalkeeper.player_id)
+        : null,
       goalkeeperTournamentGoalsConcededBefore: goalkeeperGoalsConcededBefore,
       goalkeeperTournamentGoalsConcededAfter: goalkeeperGoalsConcededAfter,
       goalkeeperTournamentGoalsConcededRankAfter:
@@ -231,13 +254,22 @@ export class InsightContextBuilder {
     if (!enteringPlayerId) {
       return {
         enteringPlayerId: null,
+        enteringPlayerName: null,
+        teamName: event.teamId ? await this.teamName(event.teamId) : null,
+        teamHasWorldCupTitle: false,
         previousAppearances: 0,
         previousTournamentAppearances: 0,
       };
     }
+    const teamHasWorldCupTitle = event.teamId
+      ? !!(await this.teamWorldCupTitleRepo.findOneBy({ team_id: event.teamId }))
+      : false;
 
     return {
       enteringPlayerId,
+      enteringPlayerName: await this.playerName(enteringPlayerId),
+      teamName: event.teamId ? await this.teamName(event.teamId) : null,
+      teamHasWorldCupTitle,
       previousAppearances: await this.playerAppearanceRepo.countBy({
         player_id: enteringPlayerId,
       }),
@@ -346,6 +378,19 @@ export class InsightContextBuilder {
     });
 
     return Number(historical?.goals ?? 0) + liveBefore;
+  }
+
+  private async tournamentTotalGoalsBefore(season: number, event: GoalScoredEvent) {
+    const historical = await this.goalRepo.countBy({
+      world_cup_year: season,
+      own_goal: false,
+    });
+    const liveBefore = await this.countLiveGoals({
+      matchId: event.matchId,
+      beforeSequence: event.identity.sequenceNumber,
+      includeOwnGoals: false,
+    });
+    return historical + liveBefore;
   }
 
   private async findGoalkeeperForTeam(matchId: string, teamId: string) {
@@ -458,6 +503,16 @@ export class InsightContextBuilder {
   private playerCouldHaveAppeared(match: Match, teamId: string) {
     return match.home_team_id === teamId || match.away_team_id === teamId;
   }
+
+  private async playerName(playerId: string) {
+    const player = await this.playerRepo.findOneBy({ player_id: playerId });
+    return fullPlayerName(player) || playerId;
+  }
+
+  private async teamName(teamId: string) {
+    const team = await this.teamRepo.findOneBy({ team_id: teamId });
+    return team?.name_en ?? teamId;
+  }
 }
 
 function latestYear(items: PlayerMatchGoalStat[]) {
@@ -475,4 +530,9 @@ function isGoalkeeperAppearance(appearance: PlayerAppearance): boolean {
   const code = (appearance.position_code ?? "").toLowerCase();
   const name = (appearance.position_name ?? "").toLowerCase();
   return code === "g" || code === "gk" || name.includes("goalkeeper");
+}
+
+function fullPlayerName(player: Player | null) {
+  if (!player) return null;
+  return `${player.name ?? ""} ${player.lastname ?? ""}`.trim() || null;
 }

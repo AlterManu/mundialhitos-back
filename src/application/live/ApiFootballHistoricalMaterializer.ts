@@ -1,4 +1,5 @@
 import { DataSource, Repository } from "typeorm";
+import { Assist } from "@/entities/Assist";
 import { Card } from "@/entities/Card";
 import { ExternalIdMapping, ExternalProvider, MappedEntityType } from "@/entities/ExternalIdMapping";
 import { Goal } from "@/entities/Goal";
@@ -16,6 +17,7 @@ import { buildInternalMatchId } from "./ApiFootballFixtureStore";
 export interface ApiFootballHistoricalMaterializationResult {
   materializedMatches: number;
   goals: number;
+  assists: number;
   cards: number;
   substitutions: number;
   penaltyKicks: number;
@@ -34,6 +36,7 @@ export class ApiFootballHistoricalMaterializer {
   private readonly mappingRepo: Repository<ExternalIdMapping>;
   private readonly matchRepo: Repository<Match>;
   private readonly goalRepo: Repository<Goal>;
+  private readonly assistRepo: Repository<Assist>;
   private readonly cardRepo: Repository<Card>;
   private readonly substitutionRepo: Repository<Substitution>;
   private readonly penaltyKickRepo: Repository<PenaltyKick>;
@@ -43,6 +46,7 @@ export class ApiFootballHistoricalMaterializer {
     this.mappingRepo = dataSource.getRepository(ExternalIdMapping);
     this.matchRepo = dataSource.getRepository(Match);
     this.goalRepo = dataSource.getRepository(Goal);
+    this.assistRepo = dataSource.getRepository(Assist);
     this.cardRepo = dataSource.getRepository(Card);
     this.substitutionRepo = dataSource.getRepository(Substitution);
     this.penaltyKickRepo = dataSource.getRepository(PenaltyKick);
@@ -55,6 +59,7 @@ export class ApiFootballHistoricalMaterializer {
     const empty = {
       materializedMatches: 0,
       goals: 0,
+      assists: 0,
       cards: 0,
       substitutions: 0,
       penaltyKicks: 0,
@@ -77,6 +82,7 @@ export class ApiFootballHistoricalMaterializer {
     return {
       materializedMatches: 1,
       goals: events.goals,
+      assists: events.assists,
       cards: events.cards,
       substitutions: events.substitutions,
       penaltyKicks: events.penaltyKicks,
@@ -87,6 +93,7 @@ export class ApiFootballHistoricalMaterializer {
 
   private async clearMaterializedMatch(matchId: string) {
     await this.goalRepo.delete({ match_id: matchId });
+    await this.assistRepo.delete({ match_id: matchId });
     await this.cardRepo.delete({ match_id: matchId });
     await this.substitutionRepo.delete({ match_id: matchId });
     await this.penaltyKickRepo.delete({ match_id: matchId });
@@ -168,6 +175,7 @@ export class ApiFootballHistoricalMaterializer {
   ) {
     const result = {
       goals: 0,
+      assists: 0,
       cards: 0,
       substitutions: 0,
       penaltyKicks: 0,
@@ -201,9 +209,10 @@ export class ApiFootballHistoricalMaterializer {
       }
 
       if (event.type === "Goal" && event.comments !== "Penalty Shootout" && event.detail !== "Missed Penalty") {
+        const goalId = `AF-${fixture.fixture.id}-G-${index}`;
         await this.goalRepo.save(
           this.goalRepo.create({
-            goal_id: `AF-${fixture.fixture.id}-G-${index}`,
+            goal_id: goalId,
             world_cup_year: fixture.league.season,
             match_id: ids.matchId,
             team_id: teamId,
@@ -218,6 +227,25 @@ export class ApiFootballHistoricalMaterializer {
           }),
         );
         result.goals += 1;
+
+        const assistPlayerId = await this.resolve(
+          MappedEntityType.Player,
+          event.assist.id,
+        );
+        const isOwnGoal = event.detail?.toLowerCase().includes("own goal") ?? false;
+        if (assistPlayerId && !isOwnGoal) {
+          await this.assistRepo.save(
+            this.assistRepo.create({
+              assist_id: `AF-${fixture.fixture.id}-A-${index}`,
+              tournament_id: String(fixture.league.season),
+              match_id: ids.matchId,
+              team_id: teamId,
+              player_id: assistPlayerId,
+              goal_id: goalId,
+            }),
+          );
+          result.assists += 1;
+        }
       }
 
       if (event.type === "Card") {

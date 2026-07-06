@@ -6,5 +6,5 @@ export const InsightImportance = {
 } as const;
 
 export function isPublishableImportance(score: number): boolean {
-  return score >= InsightImportance.Medium;
+  return score >= InsightImportance.Low;
 }

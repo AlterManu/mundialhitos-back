@@ -24,7 +24,7 @@ export class PlayerScoringStreakRule implements InsightRule {
         dedupeKey: `${this.id}:${event.playerId}:${streak}`,
         importanceScore: streak >= 5 ? InsightImportance.Historic : InsightImportance.High,
         title: "Racha goleadora",
-        body: `El jugador ${event.playerId} marcó en ${streak} partidos mundialistas consecutivos.`,
+        body: `${goalContext.playerName} marco en ${streak} partidos mundialistas consecutivos.`,
         facts: {
           playerId: event.playerId,
           streakBefore: goalContext.scoringStreakBefore,

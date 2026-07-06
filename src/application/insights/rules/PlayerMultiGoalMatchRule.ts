@@ -39,7 +39,7 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         importanceScore:
           goals === 3 ? InsightImportance.Historic : InsightImportance.High,
         title: goals === 2 ? "Primer doblete mundialista" : "Primer hat trick mundialista",
-        body: `El jugador ${event.playerId} logra su primer ${label} en una Copa del Mundo.`,
+        body: `${goalContext.playerName} logra su primer ${label} en una Copa del Mundo.`,
         facts: { playerId: event.playerId, goals },
       });
     }
@@ -55,7 +55,7 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         importanceScore:
           goals === 3 ? InsightImportance.High : InsightImportance.Medium,
         title: goals === 2 ? "Primer doblete ante este rival" : "Primer hat trick ante este rival",
-        body: `El jugador ${event.playerId} nunca le había marcado un ${label} a ${event.opponentId} en Mundiales.`,
+        body: `${goalContext.playerName} nunca le habia marcado un ${label} a ${goalContext.opponentName} en Mundiales.`,
         facts: { playerId: event.playerId, opponentId: event.opponentId, goals },
       });
     } else if (goalContext.lastPlayerMultiGoalMatchVsOpponentYear) {
@@ -68,7 +68,7 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         dedupeKey: `${this.id}:last-vs-opponent:${labelSlug}:${event.playerId}:${event.opponentId}:${event.matchId}`,
         importanceScore: InsightImportance.Medium,
         title: goals === 2 ? "Repite doblete ante este rival" : "Repite hat trick ante este rival",
-        body: `El último ${label} de ${event.playerId} ante ${event.opponentId} había sido en ${goalContext.lastPlayerMultiGoalMatchVsOpponentYear}.`,
+        body: `El ultimo ${label} de ${goalContext.playerName} ante ${goalContext.opponentName} habia sido en ${goalContext.lastPlayerMultiGoalMatchVsOpponentYear}.`,
         facts: {
           previousYear: goalContext.lastPlayerMultiGoalMatchVsOpponentYear,
           playerId: event.playerId,
@@ -87,7 +87,7 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         dedupeKey: `${this.id}:last-any-against-opponent:${labelSlug}:${event.opponentId}:${event.matchId}`,
         importanceScore: InsightImportance.Medium,
         title: goals === 2 ? "Otro doblete recibido" : "Otro hat trick recibido",
-        body: `La última vez que ${event.opponentId} recibió un ${label} en Mundiales fue en ${goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear}.`,
+        body: `La ultima vez que ${goalContext.opponentName} recibio un ${label} en Mundiales fue en ${goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear}.`,
         facts: {
           opponentId: event.opponentId,
           previousYear: goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear,

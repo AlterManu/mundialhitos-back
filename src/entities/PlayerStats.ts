@@ -15,6 +15,9 @@ export class PlayerStats {
   penalties_scored: number = 0;
 
   @Column({ type: "integer", default: 0 })
+  assists: number = 0;
+
+  @Column({ type: "integer", default: 0 })
   appearances: number = 0;
 
   @Column({ type: "integer", default: 0 })

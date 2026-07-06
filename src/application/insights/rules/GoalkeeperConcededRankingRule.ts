@@ -26,7 +26,7 @@ export class GoalkeeperConcededRankingRule implements InsightRule {
         dedupeKey: `${this.id}:${goalContext.concedingGoalkeeperId}:${context.event.matchId}:${goalsConceded}`,
         importanceScore: rank === 1 ? InsightImportance.High : InsightImportance.Medium,
         title: "Entre los arqueros mas vencidos del Mundial",
-        body: `El arquero ${goalContext.concedingGoalkeeperId} suma ${goalsConceded} goles recibidos en este Mundial y queda en el puesto ${rank}.`,
+        body: `${goalContext.concedingGoalkeeperName} suma ${goalsConceded} goles recibidos en este Mundial y queda en el puesto ${rank}.`,
         facts: {
           goalkeeperId: goalContext.concedingGoalkeeperId,
           goalsConceded,
