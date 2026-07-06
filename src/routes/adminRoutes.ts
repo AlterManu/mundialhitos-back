@@ -5,12 +5,55 @@ import {
   ApiFootballMappingBootstrapService,
 } from "@/application/mapping/ApiFootballMappingBootstrapService";
 import { ApiFootballMappingMaintenanceService } from "@/application/mapping/ApiFootballMappingMaintenanceService";
+import {
+  ApiFootballFixturePreloadOptions,
+  ApiFootballFixturePreloadService,
+} from "@/application/live/ApiFootballFixturePreloadService";
 import { AppDataSource } from "@/config/dataSource";
 import { ApiFootballClient } from "@/infrastructure/apiFootball/ApiFootballClient";
 
 export const adminRoutes: ExpressRouter = Router();
 
 let bootstrapJobManager: ApiFootballMappingBootstrapJobManager | null = null;
+
+adminRoutes.post(
+  "/api-football/world-cup/:season/fixtures/preload",
+  async (req, res, next) => {
+    try {
+      const season = Number(req.params.season);
+      if (!Number.isInteger(season)) {
+        res.status(400).json({ error: "season must be a number" });
+        return;
+      }
+
+      const client = createApiFootballClient(res);
+      if (!client) return;
+
+      const limit = parseOptionalInteger(req.body?.limit);
+      const options: ApiFootballFixturePreloadOptions = {
+        season,
+        leagueId: parseInteger(req.body?.leagueId, 1),
+        hydrateFixtures: parseBoolean(req.body?.hydrateFixtures, true),
+        materializeFinishedFixtures: parseBoolean(
+          req.body?.materializeFinishedFixtures,
+          false,
+        ),
+        delayMs: parseInteger(req.body?.delayMs, 250),
+      };
+      if (limit !== undefined) {
+        options.limit = limit;
+      }
+
+      const result = await new ApiFootballFixturePreloadService(
+        AppDataSource,
+        client,
+      ).preload(options);
+      res.json({ data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 adminRoutes.post(
   "/api-football/world-cup/:season/bootstrap",
