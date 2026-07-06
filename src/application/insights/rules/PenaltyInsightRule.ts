@@ -37,6 +37,65 @@ export class PenaltyInsightRule implements InsightRule {
           penaltyMissesBefore: goalContext.penaltyMissesBefore,
         },
       });
+
+      if (
+        goalContext.allTimePenaltyGoalRankAfter !== null &&
+        goalContext.allTimePenaltyGoalRankAfter <= 10 &&
+        (goalContext.allTimePenaltyGoalRankBefore === null ||
+          goalContext.allTimePenaltyGoalRankBefore >
+            goalContext.allTimePenaltyGoalRankAfter)
+      ) {
+        insights.push({
+          type: `${this.id}-all-time-penalty-top-10`,
+          phase: InsightPhase.Live,
+          scope: InsightScope.Player,
+          subjectId: event.playerId,
+          matchId: event.matchId,
+          dedupeKey: `${this.id}:all-time-penalties:${event.playerId}:${goalContext.allTimePenaltyGoalRankAfter}`,
+          importanceScore:
+            goalContext.allTimePenaltyGoalRankAfter <= 3
+              ? InsightImportance.High
+              : InsightImportance.Medium,
+          title: "Sube entre los especialistas de penal",
+          body: `${goalContext.playerName} se coloca en el puesto ${goalContext.allTimePenaltyGoalRankAfter} historico de penales convertidos en Mundiales.`,
+          facts: {
+            playerId: event.playerId,
+            rankBefore: goalContext.allTimePenaltyGoalRankBefore,
+            rankAfter: goalContext.allTimePenaltyGoalRankAfter,
+            penaltiesScored: goalContext.penaltyGoalsAfter,
+          },
+        });
+      }
+
+      if (
+        goalContext.nationalPenaltyGoalRankAfter !== null &&
+        goalContext.nationalPenaltyGoalRankAfter <= 10 &&
+        (goalContext.nationalPenaltyGoalRankBefore === null ||
+          goalContext.nationalPenaltyGoalRankBefore >
+            goalContext.nationalPenaltyGoalRankAfter)
+      ) {
+        insights.push({
+          type: `${this.id}-national-penalty-top-10`,
+          phase: InsightPhase.Live,
+          scope: InsightScope.Player,
+          subjectId: event.playerId,
+          matchId: event.matchId,
+          dedupeKey: `${this.id}:national-penalties:${event.teamId}:${event.playerId}:${goalContext.nationalPenaltyGoalRankAfter}`,
+          importanceScore:
+            goalContext.nationalPenaltyGoalRankAfter <= 3
+              ? InsightImportance.High
+              : InsightImportance.Medium,
+          title: "Sube entre los penaleros de su seleccion",
+          body: `${goalContext.playerName} se coloca en el puesto ${goalContext.nationalPenaltyGoalRankAfter} de penales convertidos mundialistas de ${goalContext.teamName}.`,
+          facts: {
+            playerId: event.playerId,
+            teamId: event.teamId,
+            rankBefore: goalContext.nationalPenaltyGoalRankBefore,
+            rankAfter: goalContext.nationalPenaltyGoalRankAfter,
+            penaltiesScored: goalContext.penaltyGoalsAfter,
+          },
+        });
+      }
     }
 
     if (

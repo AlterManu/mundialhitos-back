@@ -25,6 +25,14 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
       goals === 2
         ? goalContext.previousPlayerMultiGoalMatchesVsOpponent
         : goalContext.previousPlayerHatTricksVsOpponent;
+    const lastVsOpponentYear =
+      goals === 2
+        ? goalContext.lastPlayerMultiGoalMatchVsOpponentYear
+        : goalContext.lastPlayerHatTrickVsOpponentYear;
+    const lastAnyAgainstOpponentYear =
+      goals === 2
+        ? goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear
+        : goalContext.lastAnyPlayerHatTrickAgainstOpponentYear;
 
     const insights: InsightCandidate[] = [];
 
@@ -58,7 +66,7 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         body: `${goalContext.playerName} nunca le habia marcado un ${label} a ${goalContext.opponentName} en Mundiales.`,
         facts: { playerId: event.playerId, opponentId: event.opponentId, goals },
       });
-    } else if (goalContext.lastPlayerMultiGoalMatchVsOpponentYear) {
+    } else if (lastVsOpponentYear) {
       insights.push({
         type: `${this.id}-last-vs-opponent-${labelSlug}`,
         phase: InsightPhase.Live,
@@ -68,16 +76,16 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         dedupeKey: `${this.id}:last-vs-opponent:${labelSlug}:${event.playerId}:${event.opponentId}:${event.matchId}`,
         importanceScore: InsightImportance.Medium,
         title: goals === 2 ? "Repite doblete ante este rival" : "Repite hat trick ante este rival",
-        body: `El ultimo ${label} de ${goalContext.playerName} ante ${goalContext.opponentName} habia sido en ${goalContext.lastPlayerMultiGoalMatchVsOpponentYear}.`,
+        body: `El ultimo ${label} de ${goalContext.playerName} ante ${goalContext.opponentName} habia sido en ${lastVsOpponentYear}.`,
         facts: {
-          previousYear: goalContext.lastPlayerMultiGoalMatchVsOpponentYear,
+          previousYear: lastVsOpponentYear,
           playerId: event.playerId,
           opponentId: event.opponentId,
         },
       });
     }
 
-    if (goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear) {
+    if (lastAnyAgainstOpponentYear) {
       insights.push({
         type: `${this.id}-last-any-against-opponent-${labelSlug}`,
         phase: InsightPhase.Live,
@@ -87,10 +95,11 @@ export class PlayerMultiGoalMatchRule implements InsightRule {
         dedupeKey: `${this.id}:last-any-against-opponent:${labelSlug}:${event.opponentId}:${event.matchId}`,
         importanceScore: InsightImportance.Medium,
         title: goals === 2 ? "Otro doblete recibido" : "Otro hat trick recibido",
-        body: `La ultima vez que ${goalContext.opponentName} recibio un ${label} en Mundiales fue en ${goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear}.`,
+        body: `La ultima vez que ${goalContext.opponentName} recibio un ${label} en Mundiales fue en ${lastAnyAgainstOpponentYear}.`,
         facts: {
+          playerId: event.playerId,
           opponentId: event.opponentId,
-          previousYear: goalContext.lastAnyPlayerMultiGoalAgainstOpponentYear,
+          previousYear: lastAnyAgainstOpponentYear,
         },
       });
     }

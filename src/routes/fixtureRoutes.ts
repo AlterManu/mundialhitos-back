@@ -145,8 +145,11 @@ fixtureRoutes.get("/:matchId/insights", async (req, res, next) => {
   try {
     const repo = AppDataSource.getRepository(Insight);
     const phase = parsePhase(req.query.phase);
+    const includeHidden = req.query.includeHidden === "true";
+    const onlyHidden = req.query.show === "false";
     const where: FindOptionsWhere<Insight> = { match_id: req.params.matchId };
     if (phase) where.phase = phase;
+    if (!includeHidden) where.show = !onlyHidden;
 
     const insights = await repo.find({
       where,

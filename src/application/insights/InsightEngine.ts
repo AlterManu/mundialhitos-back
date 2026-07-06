@@ -7,6 +7,8 @@ import { FirstWorldCupGoalRule } from "./rules/FirstWorldCupGoalRule";
 import { GoalkeeperConcededRankingRule } from "./rules/GoalkeeperConcededRankingRule";
 import { OwnGoalInsightRule } from "./rules/OwnGoalInsightRule";
 import { PenaltyInsightRule } from "./rules/PenaltyInsightRule";
+import { PlayerAssistRankingRule } from "./rules/PlayerAssistRankingRule";
+import { PlayerCardRankingRule } from "./rules/PlayerCardRankingRule";
 import { PlayerDebutRule } from "./rules/PlayerDebutRule";
 import { PlayerGoalRankingRule } from "./rules/PlayerGoalRankingRule";
 import { PlayerMultiGoalMatchRule } from "./rules/PlayerMultiGoalMatchRule";
@@ -33,7 +35,9 @@ export class InsightEngine {
       new PlayerDebutRule(),
       new PlayerMultiGoalMatchRule(),
       new PlayerGoalRankingRule(),
+      new PlayerAssistRankingRule(),
       new PenaltyInsightRule(),
+      new PlayerCardRankingRule(),
       new OwnGoalInsightRule(),
       new TeamConcededThresholdRule(),
       new PlayerScoringStreakRule(),

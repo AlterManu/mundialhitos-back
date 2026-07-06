@@ -16,11 +16,12 @@ import { LiveEventLog, LiveEventProcessingStatus } from "@/entities/LiveEventLog
 import { Match } from "@/entities/Match";
 import { PenaltyKick } from "@/entities/PenaltyKick";
 import { Player } from "@/entities/Player";
-import {
-  PlayerGoalRanking,
-  PlayerGoalRankingScope,
-} from "@/entities/PlayerGoalRanking";
 import { PlayerMatchGoalStat } from "@/entities/PlayerMatchGoalStat";
+import {
+  PlayerStatMetric,
+  PlayerStatRanking,
+  PlayerStatRankingScope,
+} from "@/entities/PlayerStatRanking";
 import { PlayerStats } from "@/entities/PlayerStats";
 import { PlayerAppearance } from "@/entities/PlayerAppearance";
 import { Team } from "@/entities/Team";
@@ -38,7 +39,7 @@ export class InsightContextBuilder {
   private readonly teamRepo: Repository<Team>;
   private readonly teamWorldCupTitleRepo: Repository<TeamWorldCupTitle>;
   private readonly goalkeeperTournamentStatRepo: Repository<GoalkeeperTournamentStat>;
-  private readonly rankingRepo: Repository<PlayerGoalRanking>;
+  private readonly rankingRepo: Repository<PlayerStatRanking>;
   private readonly playerMatchGoalStatRepo: Repository<PlayerMatchGoalStat>;
 
   constructor(dataSource: DataSource) {
@@ -54,7 +55,7 @@ export class InsightContextBuilder {
     this.teamWorldCupTitleRepo = dataSource.getRepository(TeamWorldCupTitle);
     this.goalkeeperTournamentStatRepo =
       dataSource.getRepository(GoalkeeperTournamentStat);
-    this.rankingRepo = dataSource.getRepository(PlayerGoalRanking);
+    this.rankingRepo = dataSource.getRepository(PlayerStatRanking);
     this.playerMatchGoalStatRepo = dataSource.getRepository(PlayerMatchGoalStat);
   }
 
@@ -64,6 +65,10 @@ export class InsightContextBuilder {
   ): Promise<InsightEventContext> {
     if (isGoalScoredEvent(event)) {
       return { goal: await this.buildGoalContext(event, statistics) };
+    }
+
+    if (event.kind === LiveEventKind.CardShown) {
+      return { card: await this.buildCardContext(event) };
     }
 
     if (
@@ -116,17 +121,19 @@ export class InsightContextBuilder {
       (item) => item.opponent_team_id === event.opponentId,
     );
     const previousMultiGoalMatches = playerGoalStats.filter(
-      (item) => item.goals >= 2,
+      (item) => item.goals === 2,
     );
     const previousHatTricks = playerGoalStats.filter((item) => item.goals >= 3);
     const previousMultiGoalVsOpponent = playerVsOpponentGoalStats.filter(
-      (item) => item.goals >= 2,
+      (item) => item.goals === 2,
     );
     const previousHatTricksVsOpponent = playerVsOpponentGoalStats.filter(
       (item) => item.goals >= 3,
     );
     const lastAnyPlayerMultiGoalAgainstOpponent =
-      await this.findLastAnyPlayerMultiGoalAgainstTeam(event.opponentId);
+      await this.findLastAnyPlayerMultiGoalAgainstTeam(event.opponentId, 2);
+    const lastAnyPlayerHatTrickAgainstOpponent =
+      await this.findLastAnyPlayerMultiGoalAgainstTeam(event.opponentId, 3);
     const penaltyMissesBefore = await this.penaltyRepo.countBy({
       player_id: event.playerId,
       converted: false,
@@ -143,6 +150,13 @@ export class InsightContextBuilder {
       0;
     const playerAfterGoals =
       statistics.goal?.playerAfter.world_cup_goals ?? playerBeforeGoals;
+    const playerPenaltyGoalsBefore =
+      statistics.goal?.playerBefore?.penalties_scored ?? 0;
+    const playerPenaltyGoalsAfter =
+      statistics.goal?.playerAfter.penalties_scored ?? playerPenaltyGoalsBefore;
+    const assistTotals = event.assistPlayerId
+      ? await this.assistTotalsAfter(event.assistPlayerId)
+      : null;
     const tournamentGoalsBefore = season
       ? await this.playerTournamentGoalsBefore(event.playerId, season, event)
       : 0;
@@ -188,37 +202,126 @@ export class InsightContextBuilder {
       lastPlayerMultiGoalMatchVsOpponentYear: latestYear(
         previousMultiGoalVsOpponent,
       ),
+      lastPlayerHatTrickVsOpponentYear: latestYear(previousHatTricksVsOpponent),
       lastAnyPlayerMultiGoalAgainstOpponentYear:
         lastAnyPlayerMultiGoalAgainstOpponent?.world_cup_year ?? null,
+      lastAnyPlayerHatTrickAgainstOpponentYear:
+        lastAnyPlayerHatTrickAgainstOpponent?.world_cup_year ?? null,
       allTimeGoalRankBefore: await this.rankForGoalTotal(
-        PlayerGoalRankingScope.AllTime,
+        PlayerStatRankingScope.AllTime,
+        null,
         null,
         playerBeforeGoals,
       ),
       allTimeGoalRankAfter: await this.rankForGoalTotal(
-        PlayerGoalRankingScope.AllTime,
+        PlayerStatRankingScope.AllTime,
         null,
+        null,
+        playerAfterGoals,
+      ),
+      nationalGoalRankBefore: await this.rankForGoalTotal(
+        PlayerStatRankingScope.NationalAllTime,
+        null,
+        event.teamId,
+        playerBeforeGoals,
+      ),
+      nationalGoalRankAfter: await this.rankForGoalTotal(
+        PlayerStatRankingScope.NationalAllTime,
+        null,
+        event.teamId,
         playerAfterGoals,
       ),
       tournamentGoalRankBefore: season
         ? await this.rankForGoalTotal(
-            PlayerGoalRankingScope.Tournament,
+            PlayerStatRankingScope.Tournament,
             season,
+            null,
             tournamentGoalsBefore,
           )
         : null,
       tournamentGoalRankAfter: season
         ? await this.rankForGoalTotal(
-            PlayerGoalRankingScope.Tournament,
+            PlayerStatRankingScope.Tournament,
             season,
+            null,
             tournamentGoalsAfter,
           )
         : null,
       tournamentTotalGoalsBefore,
       tournamentTotalGoalsAfter: tournamentTotalGoalsBefore + goalAddsToPlayer,
-      penaltyGoalsBefore: statistics.goal?.playerBefore?.penalties_scored ?? 0,
-      penaltyGoalsAfter: statistics.goal?.playerAfter.penalties_scored ?? 0,
+      penaltyGoalsBefore: playerPenaltyGoalsBefore,
+      penaltyGoalsAfter: playerPenaltyGoalsAfter,
+      allTimePenaltyGoalRankBefore: await this.rankForStatTotal(
+        PlayerStatMetric.PenaltiesScored,
+        PlayerStatRankingScope.AllTime,
+        null,
+        null,
+        playerPenaltyGoalsBefore,
+      ),
+      allTimePenaltyGoalRankAfter: await this.rankForStatTotal(
+        PlayerStatMetric.PenaltiesScored,
+        PlayerStatRankingScope.AllTime,
+        null,
+        null,
+        playerPenaltyGoalsAfter,
+      ),
+      nationalPenaltyGoalRankBefore: await this.rankForStatTotal(
+        PlayerStatMetric.PenaltiesScored,
+        PlayerStatRankingScope.NationalAllTime,
+        null,
+        event.teamId,
+        playerPenaltyGoalsBefore,
+      ),
+      nationalPenaltyGoalRankAfter: await this.rankForStatTotal(
+        PlayerStatMetric.PenaltiesScored,
+        PlayerStatRankingScope.NationalAllTime,
+        null,
+        event.teamId,
+        playerPenaltyGoalsAfter,
+      ),
       penaltyMissesBefore,
+      assistAllTimeRankBefore:
+        event.assistPlayerId && assistTotals
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.Assists,
+              PlayerStatRankingScope.AllTime,
+              null,
+              null,
+              assistTotals.before,
+            )
+          : null,
+      assistAllTimeRankAfter:
+        event.assistPlayerId && assistTotals
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.Assists,
+              PlayerStatRankingScope.AllTime,
+              null,
+              null,
+              assistTotals.after,
+            )
+          : null,
+      assistNationalRankBefore:
+        event.assistPlayerId && assistTotals
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.Assists,
+              PlayerStatRankingScope.NationalAllTime,
+              null,
+              event.teamId,
+              assistTotals.before,
+            )
+          : null,
+      assistNationalRankAfter:
+        event.assistPlayerId && assistTotals
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.Assists,
+              PlayerStatRankingScope.NationalAllTime,
+              null,
+              event.teamId,
+              assistTotals.after,
+            )
+          : null,
+      assistTotalBefore: assistTotals?.before ?? null,
+      assistTotalAfter: assistTotals?.after ?? null,
       ownGoalsBefore,
       ownGoalsAfter,
       ownGoalRankAfter: await this.ownGoalRankForTotal(ownGoalsAfter),
@@ -282,6 +385,112 @@ export class InsightContextBuilder {
     };
   }
 
+  private async buildCardContext(event: LiveEvent) {
+    const playerName = event.playerId ? await this.playerName(event.playerId) : "";
+    const teamName = event.teamId ? await this.teamName(event.teamId) : null;
+    const playerStats = event.playerId
+      ? await this.playerStatsRepo.findOneBy({ player_id: event.playerId })
+      : null;
+    const detail = (event.detail ?? "").toLowerCase();
+    const secondYellow = detail.includes("second yellow");
+    const rankings = [];
+
+    if (event.playerId && detail.includes("yellow")) {
+      const totalAfter = playerStats?.yellow_cards ?? 0;
+      const totalBefore = Math.max(totalAfter - 1, 0);
+      rankings.push({
+        metric: PlayerStatMetric.YellowCards,
+        label: "tarjetas amarillas",
+        totalBefore,
+        totalAfter,
+        allTimeRankBefore: await this.rankForStatTotal(
+          PlayerStatMetric.YellowCards,
+          PlayerStatRankingScope.AllTime,
+          null,
+          null,
+          totalBefore,
+        ),
+        allTimeRankAfter: await this.rankForStatTotal(
+          PlayerStatMetric.YellowCards,
+          PlayerStatRankingScope.AllTime,
+          null,
+          null,
+          totalAfter,
+        ),
+        nationalRankBefore: event.teamId
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.YellowCards,
+              PlayerStatRankingScope.NationalAllTime,
+              null,
+              event.teamId,
+              totalBefore,
+            )
+          : null,
+        nationalRankAfter: event.teamId
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.YellowCards,
+              PlayerStatRankingScope.NationalAllTime,
+              null,
+              event.teamId,
+              totalAfter,
+            )
+          : null,
+      });
+    }
+
+    if (event.playerId && (detail.includes("red") || secondYellow)) {
+      const totalAfter = playerStats?.red_cards ?? 0;
+      const totalBefore = Math.max(totalAfter - 1, 0);
+      rankings.push({
+        metric: PlayerStatMetric.RedCards,
+        label: "tarjetas rojas",
+        totalBefore,
+        totalAfter,
+        allTimeRankBefore: await this.rankForStatTotal(
+          PlayerStatMetric.RedCards,
+          PlayerStatRankingScope.AllTime,
+          null,
+          null,
+          totalBefore,
+        ),
+        allTimeRankAfter: await this.rankForStatTotal(
+          PlayerStatMetric.RedCards,
+          PlayerStatRankingScope.AllTime,
+          null,
+          null,
+          totalAfter,
+        ),
+        nationalRankBefore: event.teamId
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.RedCards,
+              PlayerStatRankingScope.NationalAllTime,
+              null,
+              event.teamId,
+              totalBefore,
+            )
+          : null,
+        nationalRankAfter: event.teamId
+          ? await this.rankForStatTotal(
+              PlayerStatMetric.RedCards,
+              PlayerStatRankingScope.NationalAllTime,
+              null,
+              event.teamId,
+              totalAfter,
+            )
+          : null,
+      });
+    }
+
+    return {
+      playerName,
+      teamName,
+      rankings: rankings.map((ranking) => ({
+        ...ranking,
+        metric: ranking.metric as "yellow_cards" | "red_cards",
+      })),
+    };
+  }
+
   private async countLiveGoals(options: {
     matchId: string;
     playerId?: string;
@@ -316,34 +525,100 @@ export class InsightContextBuilder {
     }).length;
   }
 
-  private async findLastAnyPlayerMultiGoalAgainstTeam(teamId: string) {
-    return this.playerMatchGoalStatRepo
+  private async findLastAnyPlayerMultiGoalAgainstTeam(
+    teamId: string,
+    minimumGoals: 2 | 3,
+  ) {
+    const query = this.playerMatchGoalStatRepo
       .createQueryBuilder("stat")
       .where("stat.opponent_team_id = :teamId", { teamId })
-      .andWhere("stat.goals >= 2")
       .orderBy("stat.world_cup_year", "DESC")
-      .addOrderBy("stat.match_date", "DESC")
-      .getOne();
+      .addOrderBy("stat.match_date", "DESC");
+
+    if (minimumGoals === 2) {
+      query.andWhere("stat.goals = 2");
+    } else {
+      query.andWhere("stat.goals >= 3");
+    }
+
+    return query.getOne();
   }
 
   private async rankForGoalTotal(
-    scope: PlayerGoalRankingScope,
+    scope: PlayerStatRankingScope,
     worldCupYear: number | null,
+    teamId: string | null,
     goals: number,
   ) {
-    if (goals <= 0) return null;
+    return this.rankForStatTotal(
+      PlayerStatMetric.Goals,
+      scope,
+      worldCupYear,
+      teamId,
+      goals,
+    );
+  }
+
+  private async rankForStatTotal(
+    metric: PlayerStatMetric,
+    scope: PlayerStatRankingScope,
+    worldCupYear: number | null,
+    teamId: string | null,
+    value: number,
+  ) {
+    if (value <= 0) return null;
+    if (!(await this.hasRankingSet(metric, scope, worldCupYear, teamId))) {
+      return null;
+    }
     const query = this.rankingRepo
       .createQueryBuilder("ranking")
-      .where("ranking.scope = :scope", { scope })
-      .andWhere("ranking.goals > :goals", { goals });
+      .where("ranking.metric = :metric", { metric })
+      .andWhere("ranking.scope = :scope", { scope })
+      .andWhere("ranking.value > :value", { value });
 
+    this.applyRankingScope(query, worldCupYear, teamId);
+
+    return (await query.getCount()) + 1;
+  }
+
+  private async hasRankingSet(
+    metric: PlayerStatMetric,
+    scope: PlayerStatRankingScope,
+    worldCupYear: number | null,
+    teamId: string | null,
+  ) {
+    const query = this.rankingRepo
+      .createQueryBuilder("ranking")
+      .where("ranking.metric = :metric", { metric })
+      .andWhere("ranking.scope = :scope", { scope });
+
+    this.applyRankingScope(query, worldCupYear, teamId);
+
+    return (await query.getCount()) > 0;
+  }
+
+  private applyRankingScope(
+    query: ReturnType<Repository<PlayerStatRanking>["createQueryBuilder"]>,
+    worldCupYear: number | null,
+    teamId: string | null,
+  ) {
     if (worldCupYear === null) {
       query.andWhere("ranking.world_cup_year IS NULL");
     } else {
       query.andWhere("ranking.world_cup_year = :worldCupYear", { worldCupYear });
     }
 
-    return (await query.getCount()) + 1;
+    if (teamId === null) {
+      query.andWhere("ranking.team_id IS NULL");
+    } else {
+      query.andWhere("ranking.team_id = :teamId", { teamId });
+    }
+  }
+
+  private async assistTotalsAfter(playerId: string) {
+    const stats = await this.playerStatsRepo.findOneBy({ player_id: playerId });
+    const after = stats?.assists ?? 0;
+    return { before: Math.max(after - 1, 0), after };
   }
 
   private async ownGoalRankForTotal(ownGoals: number) {

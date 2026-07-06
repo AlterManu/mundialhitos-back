@@ -62,6 +62,9 @@ export class Insight {
   @Column({ type: "varchar", default: InsightStatus.Candidate })
   status!: InsightStatus;
 
+  @Column({ type: "boolean", default: true })
+  show: boolean = true;
+
   @CreateDateColumn()
   created_at!: Date;
 }

@@ -1,5 +1,5 @@
 import { Router, type Router as ExpressRouter } from "express";
-import { FindManyOptions } from "typeorm";
+import { FindManyOptions, FindOptionsWhere } from "typeorm";
 import { AppDataSource } from "@/config/dataSource";
 import { Insight, InsightStatus } from "@/entities/Insight";
 
@@ -10,6 +10,9 @@ insightRoutes.get("/", async (req, res, next) => {
     const repo = AppDataSource.getRepository(Insight);
     const status = parseStatus(req.query.status);
     const take = parseLimit(req.query.limit);
+    const includeHidden = req.query.includeHidden === "true";
+    const onlyHidden = req.query.show === "false";
+    const where: FindOptionsWhere<Insight> = {};
 
     const options: FindManyOptions<Insight> = {
       order: {
@@ -20,7 +23,13 @@ insightRoutes.get("/", async (req, res, next) => {
     };
 
     if (status) {
-      options.where = { status };
+      where.status = status;
+    }
+    if (!includeHidden) {
+      where.show = !onlyHidden;
+    }
+    if (Object.keys(where).length > 0) {
+      options.where = where;
     }
 
     const insights = await repo.find(options);

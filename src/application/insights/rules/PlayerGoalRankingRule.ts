@@ -66,6 +66,34 @@ export class PlayerGoalRankingRule implements InsightRule {
       });
     }
 
+    if (
+      goalContext.nationalGoalRankAfter !== null &&
+      goalContext.nationalGoalRankAfter <= 10 &&
+      (goalContext.nationalGoalRankBefore === null ||
+        goalContext.nationalGoalRankBefore > goalContext.nationalGoalRankAfter)
+    ) {
+      insights.push({
+        type: `${this.id}-national-top-10`,
+        phase: InsightPhase.Live,
+        scope: InsightScope.Player,
+        subjectId: event.playerId,
+        matchId: event.matchId,
+        dedupeKey: `${this.id}:national:${event.teamId}:${event.playerId}:${goalContext.nationalGoalRankAfter}`,
+        importanceScore:
+          goalContext.nationalGoalRankAfter <= 3
+            ? InsightImportance.Historic
+            : InsightImportance.High,
+        title: "Sube en la historia de su seleccion",
+        body: `${goalContext.playerName} se coloca en el puesto ${goalContext.nationalGoalRankAfter} de goleadores mundialistas de ${goalContext.teamName}.`,
+        facts: {
+          playerId: event.playerId,
+          teamId: event.teamId,
+          rankBefore: goalContext.nationalGoalRankBefore,
+          rankAfter: goalContext.nationalGoalRankAfter,
+        },
+      });
+    }
+
     return insights;
   }
 }

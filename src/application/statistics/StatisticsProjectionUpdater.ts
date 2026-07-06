@@ -267,8 +267,9 @@ export class StatisticsProjectionUpdater {
       (await this.playerStatsRepo.findOneBy({ player_id: event.playerId })) ??
       this.playerStatsRepo.create({ player_id: event.playerId });
     const detail = (event.detail ?? "").toLowerCase();
+    const secondYellow = detail.includes("second yellow");
     const yellow = detail.includes("yellow");
-    const red = detail.includes("red");
+    const red = detail.includes("red") || secondYellow;
     if (yellow) player.yellow_cards += 1;
     if (red) player.red_cards += 1;
     await this.playerStatsRepo.save(player);

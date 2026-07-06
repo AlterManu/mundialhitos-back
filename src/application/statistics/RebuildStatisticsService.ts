@@ -11,6 +11,11 @@ import {
 import { PlayerMatchGoalStat } from "@/entities/PlayerMatchGoalStat";
 import { PlayerOpponentStats } from "@/entities/PlayerOpponentStats";
 import { PlayerAppearance } from "@/entities/PlayerAppearance";
+import {
+  PlayerStatMetric,
+  PlayerStatRanking,
+  PlayerStatRankingScope,
+} from "@/entities/PlayerStatRanking";
 import { PlayerStats } from "@/entities/PlayerStats";
 import { PlayerTournamentStat } from "@/entities/PlayerTournamentStat";
 import { TeamOpponentStats } from "@/entities/TeamOpponentStats";
@@ -31,6 +36,7 @@ export interface RebuildStatisticsResult {
   teamWorldCupTitles: number;
   goalkeeperTournamentStats: number;
   playerTournamentStats: number;
+  playerStatRankings: number;
 }
 
 export class RebuildStatisticsService {
@@ -45,6 +51,7 @@ export class RebuildStatisticsService {
   private readonly teamOpponentStatsRepo: Repository<TeamOpponentStats>;
   private readonly playerMatchGoalStatRepo: Repository<PlayerMatchGoalStat>;
   private readonly playerGoalRankingRepo: Repository<PlayerGoalRanking>;
+  private readonly playerStatRankingRepo: Repository<PlayerStatRanking>;
   private readonly playerTournamentStatRepo: Repository<PlayerTournamentStat>;
   private readonly teamTournamentStatRepo: Repository<TeamTournamentStat>;
   private readonly teamWorldCupTitleRepo: Repository<TeamWorldCupTitle>;
@@ -62,6 +69,7 @@ export class RebuildStatisticsService {
     this.teamOpponentStatsRepo = dataSource.getRepository(TeamOpponentStats);
     this.playerMatchGoalStatRepo = dataSource.getRepository(PlayerMatchGoalStat);
     this.playerGoalRankingRepo = dataSource.getRepository(PlayerGoalRanking);
+    this.playerStatRankingRepo = dataSource.getRepository(PlayerStatRanking);
     this.playerTournamentStatRepo = dataSource.getRepository(PlayerTournamentStat);
     this.teamTournamentStatRepo = dataSource.getRepository(TeamTournamentStat);
     this.teamWorldCupTitleRepo = dataSource.getRepository(TeamWorldCupTitle);
@@ -77,6 +85,7 @@ export class RebuildStatisticsService {
       await this.teamStatsRepo.clear();
       await this.playerMatchGoalStatRepo.clear();
       await this.playerGoalRankingRepo.clear();
+      await this.playerStatRankingRepo.clear();
       await this.playerTournamentStatRepo.clear();
       await this.teamTournamentStatRepo.clear();
       await this.teamWorldCupTitleRepo.clear();
@@ -270,6 +279,12 @@ export class RebuildStatisticsService {
     const titles = this.buildWorldCupTitles(matches);
     this.applyGoalkeeperStats(playerAppearances, matchesById, goalkeeperTournamentStats);
     const rankings = this.buildGoalRankings([...playerMatchGoalStats.values()]);
+    const statRankings = this.buildStatRankings(
+      [...playerMatchGoalStats.values()],
+      assists,
+      cards,
+      matchesById,
+    );
 
     await this.teamStatsRepo.save([...teamStats.values()]);
     await this.teamOpponentStatsRepo.save([...teamOpponentStats.values()]);
@@ -277,6 +292,7 @@ export class RebuildStatisticsService {
     await this.playerOpponentStatsRepo.save([...playerOpponentStats.values()]);
     await this.playerMatchGoalStatRepo.save([...playerMatchGoalStats.values()]);
     await this.playerGoalRankingRepo.save(rankings);
+    await this.playerStatRankingRepo.save(statRankings);
     await this.playerTournamentStatRepo.save([...playerTournamentStats.values()]);
     await this.teamTournamentStatRepo.save([...teamTournamentStats.values()]);
     await this.teamWorldCupTitleRepo.save(titles);
@@ -297,6 +313,7 @@ export class RebuildStatisticsService {
       teamWorldCupTitles: titles.length,
       goalkeeperTournamentStats: goalkeeperTournamentStats.size,
       playerTournamentStats: playerTournamentStats.size,
+      playerStatRankings: statRankings.length,
     };
   }
 
@@ -362,6 +379,161 @@ export class RebuildStatisticsService {
         });
       }),
     ];
+  }
+
+  private buildStatRankings(
+    matchGoalStats: PlayerMatchGoalStat[],
+    assists: Assist[],
+    cards: Card[],
+    matchesById: Map<string, Match>,
+  ) {
+    const metrics = new Map<PlayerStatMetric, MetricBuckets>();
+    const getBuckets = (metric: PlayerStatMetric) =>
+      getOrCreate(metrics, metric, () => ({
+        allTime: new Map<string, number>(),
+        tournament: new Map<string, number>(),
+        national: new Map<string, number>(),
+        nationalTeamTotals: new Map<string, number>(),
+      }));
+
+    const add = (options: {
+      metric: PlayerStatMetric;
+      playerId: string;
+      value: number;
+      teamId: string | null;
+      year: number | null;
+    }) => {
+      if (options.value <= 0) return;
+      const buckets = getBuckets(options.metric);
+      increment(buckets.allTime, options.playerId, options.value);
+
+      if (options.year !== null) {
+        increment(
+          buckets.tournament,
+          `${options.year}:${options.playerId}`,
+          options.value,
+        );
+      }
+
+      if (options.teamId) {
+        increment(
+          buckets.national,
+          `${options.teamId}:${options.playerId}`,
+          options.value,
+        );
+        increment(buckets.nationalTeamTotals, options.teamId, options.value);
+      }
+    };
+
+    for (const stat of matchGoalStats) {
+      add({
+        metric: PlayerStatMetric.Goals,
+        playerId: stat.player_id,
+        value: stat.goals,
+        teamId: stat.team_id,
+        year: stat.world_cup_year,
+      });
+      add({
+        metric: PlayerStatMetric.PenaltiesScored,
+        playerId: stat.player_id,
+        value: stat.penalties_scored,
+        teamId: stat.team_id,
+        year: stat.world_cup_year,
+      });
+    }
+
+    for (const assist of assists) {
+      const match = matchesById.get(assist.match_id);
+      const parsedYear = Number(assist.tournament_id);
+      add({
+        metric: PlayerStatMetric.Assists,
+        playerId: assist.player_id,
+        value: 1,
+        teamId: assist.team_id,
+        year:
+          match?.world_cup_year ??
+          (Number.isInteger(parsedYear) ? parsedYear : null),
+      });
+    }
+
+    for (const card of cards) {
+      const match = matchesById.get(card.match_id);
+      const parsedYear = Number(card.tournament_id);
+      const year =
+        match?.world_cup_year ??
+        (Number.isInteger(parsedYear) ? parsedYear : null);
+      if (card.yellow_card || card.second_yellow_card) {
+        add({
+          metric: PlayerStatMetric.YellowCards,
+          playerId: card.player_id,
+          value: 1,
+          teamId: card.team_id,
+          year,
+        });
+      }
+      if (card.red_card || card.second_yellow_card) {
+        add({
+          metric: PlayerStatMetric.RedCards,
+          playerId: card.player_id,
+          value: 1,
+          teamId: card.team_id,
+          year,
+        });
+      }
+    }
+
+    const rankings: PlayerStatRanking[] = [];
+    for (const [metric, buckets] of metrics.entries()) {
+      rankings.push(
+        ...rankTopEntries([...buckets.allTime.entries()]).map(
+          ([playerId, value, rank]) =>
+            this.playerStatRankingRepo.create({
+              metric,
+              scope: PlayerStatRankingScope.AllTime,
+              team_id: null,
+              world_cup_year: null,
+              player_id: playerId,
+              value,
+              rank_position: rank,
+            }),
+        ),
+      );
+
+      for (const [year, entries] of groupTournamentEntries(buckets.tournament)) {
+        rankings.push(
+          ...rankTopEntries(entries).map(([playerId, value, rank]) =>
+            this.playerStatRankingRepo.create({
+              metric,
+              scope: PlayerStatRankingScope.Tournament,
+              team_id: null,
+              world_cup_year: year,
+              player_id: playerId,
+              value,
+              rank_position: rank,
+            }),
+          ),
+        );
+      }
+
+      for (const [teamId, entries] of groupNationalEntries(buckets.national)) {
+        if ((buckets.nationalTeamTotals.get(teamId) ?? 0) < 20) continue;
+        rankings.push(
+          ...rankTopEntries(entries).map(([playerId, value, rank]) =>
+            this.playerStatRankingRepo.create({
+              metric,
+              scope: PlayerStatRankingScope.NationalAllTime,
+              team_id: teamId,
+              world_cup_year: null,
+              player_id: playerId,
+              value,
+              rank_position: rank,
+            }),
+          ),
+        );
+      }
+    }
+
+    return rankings;
   }
 
   private buildWorldCupTitles(matches: Match[]) {
@@ -436,6 +608,50 @@ function rankEntries(entries: [string, number][]): [string, number, number][] {
     previousRank = rank;
     return [id, goals, rank];
   });
+}
+
+interface MetricBuckets {
+  allTime: Map<string, number>;
+  tournament: Map<string, number>;
+  national: Map<string, number>;
+  nationalTeamTotals: Map<string, number>;
+}
+
+function increment(map: Map<string, number>, key: string, value: number): void {
+  map.set(key, (map.get(key) ?? 0) + value);
+}
+
+function rankTopEntries(entries: [string, number][]): [string, number, number][] {
+  return rankEntries(entries).filter(([, , rank]) => rank <= 10);
+}
+
+function groupTournamentEntries(
+  entries: Map<string, number>,
+): [number, [string, number][]][] {
+  const grouped = new Map<number, [string, number][]>();
+  for (const [key, value] of entries.entries()) {
+    const [yearRaw, playerId] = key.split(":");
+    const year = Number(yearRaw);
+    if (!Number.isInteger(year) || !playerId) continue;
+    const items = grouped.get(year) ?? [];
+    items.push([playerId, value]);
+    grouped.set(year, items);
+  }
+  return [...grouped.entries()];
+}
+
+function groupNationalEntries(
+  entries: Map<string, number>,
+): [string, [string, number][]][] {
+  const grouped = new Map<string, [string, number][]>();
+  for (const [key, value] of entries.entries()) {
+    const [teamId, playerId] = key.split(":");
+    if (!teamId || !playerId) continue;
+    const items = grouped.get(teamId) ?? [];
+    items.push([playerId, value]);
+    grouped.set(teamId, items);
+  }
+  return [...grouped.entries()];
 }
 
 function isKnockoutStage(stageName: string | null): boolean {
