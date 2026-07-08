@@ -14,6 +14,7 @@
     "historical:import": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/importHistoricalDatasets.ts",
     "api-football:preload-fixtures": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/preloadApiFootballFixtures.ts",
     "api-football:simulate-2022": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/simulateApiFootball2022.ts",
+    "api-football:simulate-season": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/simulatePendingSeason.ts",
     "api-football:reclassify-created-players": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/reclassifyApiFootballCreatedPlayers.ts",
     "stats:rebuild": "ts-node-dev --transpile-only -r tsconfig-paths/register src/scripts/rebuildStatistics.ts",
     "script": "ts-node-dev --transpile-only src/scripts/getMaxScorer.ts"

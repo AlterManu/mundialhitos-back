@@ -96,6 +96,34 @@ fixtureRoutes.post("/simulation/next/materialize", async (req, res, next) => {
   }
 });
 
+fixtureRoutes.post("/simulation/next/run", async (req, res, next) => {
+  try {
+    const season = parseRequiredSeason(req.body?.season ?? req.query.season);
+    const service = new ApiFootballChronologicalSimulationService(AppDataSource);
+    const result = await service.simulateNextComplete(season);
+
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+fixtureRoutes.post("/simulation/run", async (req, res, next) => {
+  try {
+    const season = parseRequiredSeason(req.body?.season ?? req.query.season);
+    const limit = parseOptionalLimit(req.body?.limit ?? req.query.limit);
+    const service = new ApiFootballChronologicalSimulationService(AppDataSource);
+    const result = await service.simulatePendingSeason(
+      season,
+      limit === undefined ? undefined : { limit },
+    );
+
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 fixtureRoutes.get("/:matchId", async (req, res, next) => {
   try {
     const fixture = await getFixture(req.params.matchId);
@@ -243,6 +271,17 @@ function parseLimit(value: unknown, fallback: number): number {
   if (typeof value !== "string") return fallback;
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) return fallback;
+  return Math.min(Math.max(parsed, 1), 500);
+}
+
+function parseOptionalLimit(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed)) {
+    const error = new Error("limit must be a number");
+    Object.assign(error, { status: 400 });
+    throw error;
+  }
   return Math.min(Math.max(parsed, 1), 500);
 }
 
